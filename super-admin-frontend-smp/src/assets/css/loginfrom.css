@@ -1,0 +1,198 @@
+/* Root variables for fonts and transitions */
+:root {
+    --primary-font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --transition: all 0.3s ease;
+  }
+  
+  /* Light Theme */
+  [data-theme="light"] {
+    --bg-color: #f7fafc;
+    --form-bg: #ffffff;
+    --text-color: #1a202c;
+    --input-border: #e2e8f0;
+    --input-focus: #2b6cb0;
+    --button-bg: #2b6cb0;
+    --button-hover: #2c5282;
+    --error-color: #e53e3e;
+    --shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    --toggle-bg: #edf2f7;
+  }
+  
+  /* Dark Theme */
+  [data-theme="dark"] {
+    --bg-color: #1a202c;
+    --form-bg: #2d3748;
+    --text-color: #e2e8f0;
+    --input-border: #4a5568;
+    --input-focus: #63b3ed;
+    --button-bg: #63b3ed;
+    --button-hover: #4299e1;
+    --error-color: #feb2b2;
+    --shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+    --toggle-bg: #4a5568;
+  }
+  
+  /* Blue Theme */
+  [data-theme="blue"] {
+    --bg-color: #ebf4ff;
+    --form-bg: #ffffff;
+    --text-color: #1a3c6e;
+    --input-border: #b1c5e0;
+    --input-focus: #1a73e8;
+    --button-bg: #1a73e8;
+    --button-hover: #1565c0;
+    --error-color: #c53030;
+    --shadow: 0 10px 20px rgba(26, 115, 232, 0.2);
+    --toggle-bg: #e1e7ff;
+  }
+  
+  /* Global Styles */
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: var(--bg-color);
+    font-family: var(--primary-font);
+    transition: var(--transition);
+  }
+  
+  .login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    position: relative;
+    padding: 1rem;
+  }
+  
+  form {
+    background-color: var(--form-bg);
+    padding: 2.5rem;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    width: 100%;
+    max-width: 450px;
+    transition: var(--transition);
+  }
+  
+  .form-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-color);
+    margin-bottom: 2rem;
+    text-align: center;
+  }
+  
+  div {
+    margin-bottom: 1.75rem;
+  }
+  
+  label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: var(--text-color);
+    font-size: 0.95rem;
+  }
+  
+  input {
+    width: 100%;
+    padding: 0.875rem;
+    border: 1px solid var(--input-border);
+    border-radius: 8px;
+    font-size: 1rem;
+    color: var(--text-color);
+    background-color: var(--form-bg);
+    box-sizing: border-box;
+    transition: var(--transition);
+  }
+  
+  input:focus {
+    outline: none;
+    border-color: var(--input-focus);
+    box-shadow: 0 0 8px rgba(var(--input-focus), 0.3);
+  }
+  
+  button {
+    width: 100%;
+    padding: 1rem;
+    background-color: var(--button-bg);
+    border: none;
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+  
+  button:hover:not(:disabled) {
+    background-color: var(--button-hover);
+    transform: translateY(-2px);
+  }
+  
+  button:focus {
+    outline: none;
+    box-shadow: 0 0 8px rgba(var(--button-bg), 0.4);
+  }
+  
+  button:disabled {
+    background-color: #a0aec0;
+    cursor: not-allowed;
+    transform: none;
+  }
+  
+  .error-message {
+    color: var(--error-color);
+    font-size: 0.875rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    font-weight: 500;
+  }
+  
+  .theme-toggle {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    padding: 0.5rem;
+    border-radius: 8px;
+    border: 1px solid var(--input-border);
+    background-color: var(--toggle-bg);
+    color: var(--text-color);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+  
+  .theme-toggle:focus {
+    outline: none;
+    border-color: var(--input-focus);
+    box-shadow: 0 0 8px rgba(var(--input-focus), 0.3);
+  }
+  
+  /* Responsive Design */
+  @media (max-width: 480px) {
+    .login-container {
+      padding: 0.5rem;
+    }
+  
+    form {
+      padding: 1.5rem;
+      max-width: 90%;
+    }
+  
+    .form-title {
+      font-size: 1.5rem;
+    }
+  
+    input,
+    button {
+      font-size: 0.95rem;
+      padding: 0.75rem;
+    }
+  
+    .theme-toggle {
+      top: 1rem;
+      right: 1rem;
+      font-size: 0.8rem;
+    }
+  }

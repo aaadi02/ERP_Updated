@@ -1,0 +1,177 @@
+@import "tailwindcss";
+
+
+/* Base theme variables */
+:root {
+  --bg-primary: #f9fafb;
+  --bg-secondary: #ffffff;
+  --text-primary: #1f2937;
+  --text-secondary: #4b5563;
+  --accent-color: #3b82f6;
+  --border-color: #e5e7eb;
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --bg-color-light: #f9fafb;
+  --bg-color-dark: #1a202c;
+  --text-color-light: #1a202c;
+  --text-color-dark: #f9fafb;
+}
+
+/* Dark theme */
+.theme-dark {
+  --bg-primary: #111827;
+  --bg-secondary: #1f2937;
+  --text-primary: #f9fafb;
+  --text-secondary: #d1d5db;
+  --accent-color: #60a5fa;
+  --border-color: #374151;
+  --shadow-color: rgba(0, 0, 0, 0.25);
+}
+
+/* Blue theme */
+.theme-blue {
+  --bg-primary: #eff6ff;
+  --bg-secondary: #dbeafe;
+  --text-primary: #1e3a8a;
+  --text-secondary: #3b82f6;
+  --accent-color: #2563eb;
+  --border-color: #bfdbfe;
+  --shadow-color: rgba(37, 99, 235, 0.1);
+}
+
+/* Extend Tailwind with custom theme classes */
+@layer utilities {
+  .theme-blue\:bg-blue-50 {
+    background-color: var(--bg-secondary);
+  }
+
+  .theme-blue\:bg-blue-100 {
+    background-color: #dbeafe;
+  }
+
+  .theme-blue\:bg-blue-200 {
+    background-color: #bfdbfe;
+  }
+
+  .theme-blue\:text-blue-700 {
+    color: #1d4ed8;
+  }
+
+  .theme-blue\:text-blue-800 {
+    color: #1e40af;
+  }
+
+  .theme-blue\:text-blue-900 {
+    color: #1e3a8a;
+  }
+
+  .theme-blue\:border-blue-200 {
+    border-color: #bfdbfe;
+  }
+
+  .theme-blue\:hover\:bg-blue-100:hover {
+    background-color: #dbeafe;
+  }
+
+  .theme-blue\:bg-red-50 {
+    background-color: #fef2f2;
+  }
+
+  .theme-blue\:text-red-800 {
+    color: #991b1b;
+  }
+}
+
+/* Dark mode styles */
+.dark {
+  color-scheme: dark;
+  background-color: var(--bg-color-dark);
+  color: var(--text-color-dark);
+}
+
+/* Apply these classes to body or html to ensure full page theming */
+body,
+html {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.light {
+  background-color: var(--bg-color-light);
+  color: var(--text-color-light);
+}
+
+/* 
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+
+a:hover {
+  color: #535bf2;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+
+button:hover {
+  border-color: #646cff;
+}
+
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+
+  a:hover {
+    color: #747bff;
+  }
+
+  button {
+    background-color: #f9f9f9;
+  }
+} */

@@ -1,0 +1,367 @@
+/* Root variables for fonts and transitions */
+:root {
+    --primary-font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --transition: all 0.3s ease;
+  }
+  
+  /* Light Theme */
+  [data-theme="light"] {
+    --bg-color: #f7fafc;
+    --container-bg: #ffffff;
+    --text-color: #1a202c;
+    --border-color: #e2e8f0;
+    --button-bg: #2b6cb0;
+    --button-hover: #2c5282;
+    --error-color: #e53e3e;
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --input-bg: #f7fafc;
+    --input-border: #cbd5e0;
+  }
+  
+  /* Dark Theme */
+  [data-theme="dark"] {
+    --bg-color: #1a202c;
+    --container-bg: #2d3748;
+    --text-color: #e2e8f0;
+    --border-color: #4a5568;
+    --button-bg: #63b3ed;
+    --button-hover: #4299e1;
+    --error-color: #feb2b2;
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    --input-bg: #2d3748;
+    --input-border: #718096;
+  }
+  
+  /* Blue Theme */
+  [data-theme="blue"] {
+    --bg-color: #ebf4ff;
+    --container-bg: #ffffff;
+    --text-color: #1a3c6e;
+    --border-color: #b1c5e0;
+    --button-bg: #1a73e8;
+    --button-hover: #1565c0;
+    --error-color: #c53030;
+    --shadow: 0 4px 12px rgba(26, 115, 232, 0.15);
+    --input-bg: #e1e7ff;
+    --input-border: #93b4e6;
+  }
+  
+  /* Subject Manager Container */
+  .subject-manager {
+    max-width: 100%;
+    padding: 1.5rem;
+    background-color: var(--container-bg);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+  }
+  
+  /* Heading */
+  .subject-manager h3 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin-bottom: 1.5rem;
+  }
+  
+  /* Form Styling */
+  .subject-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    align-items: flex-end;
+  }
+  
+  .subject-form input,
+  .subject-form select {
+    flex: 1;
+    min-width: 150px;
+    padding: 0.75rem;
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    font-size: 0.95rem;
+    transition: var(--transition);
+  }
+  
+  .subject-form input:focus,
+  .subject-form select:focus {
+    outline: none;
+    border-color: var(--button-bg);
+    box-shadow: 0 0 6px rgba(var(--button-bg), 0.3);
+  }
+  
+  .subject-form input::placeholder {
+    color: var(--text-color);
+    opacity: 0.6;
+  }
+  
+  .subject-form button {
+    padding: 0.75rem 1.5rem;
+    background-color: var(--button-bg);
+    border: none;
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+  
+  .subject-form button:hover {
+    background-color: var(--button-hover);
+    transform: translateY(-1px);
+  }
+  
+  .subject-form button:focus {
+    outline: none;
+    box-shadow: 0 0 6px rgba(var(--button-bg), 0.4);
+  }
+  
+  /* Subject List */
+  .subject-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .subject-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--container-bg);
+    transition: var(--transition);
+  }
+  
+  .subject-list li:last-child {
+    border-bottom: none;
+  }
+  
+  .subject-list li:hover {
+    background-color: var(--input-bg);
+  }
+  
+  .subject-list li span {
+    flex: 1;
+    font-size: 0.95rem;
+    color: var(--text-color);
+  }
+  
+  .subject-list li input {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    font-size: 0.9rem;
+    margin-right: 1rem;
+  }
+  
+  .subject-list li input:focus {
+    outline: none;
+    border-color: var(--button-bg);
+    box-shadow: 0 0 6px rgba(var(--button-bg), 0.3);
+  }
+  
+  .subject-list li button {
+    padding: 0.5rem 1rem;
+    background-color: var(--button-bg);
+    border: none;
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    margin-left: 0.5rem;
+  }
+  
+  .subject-list li button:hover {
+    background-color: var(--button-hover);
+    transform: translateY(-1px);
+  }
+  
+  .subject-list li button:focus {
+    outline: none;
+    box-shadow: 0 0 6px rgba(var(--button-bg), 0.4);
+  }
+  
+  .subject-list li button.delete {
+    background-color: #dc2626;
+  }
+  
+  .subject-list li button.delete:hover {
+    background-color: #b91c1c;
+  }
+  
+  /* Responsive Design */
+  
+  /* Mobile (≤480px) */
+  @media (max-width: 480px) {
+    .subject-manager {
+      padding: 1rem;
+    }
+  
+    .subject-manager h3 {
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+    }
+  
+    .subject-form {
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+  
+    .subject-form input,
+    .subject-form select {
+      min-width: 100%;
+      padding: 0.6rem;
+      font-size: 0.9rem;
+    }
+  
+    .subject-form button {
+      width: 100%;
+      padding: 0.6rem;
+      font-size: 0.9rem;
+    }
+  
+    .subject-list li {
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 0.75rem;
+    }
+  
+    .subject-list li span,
+    .subject-list li input {
+      width: 100%;
+      margin-bottom: 0.75rem;
+      margin-right: 0;
+    }
+  
+    .subject-list li button {
+      width: 100%;
+      padding: 0.5rem;
+      font-size: 0.85rem;
+      margin-left: 0;
+      margin-top: 0.5rem;
+    }
+  }
+  
+  /* Tablet (481px–768px) */
+  @media (min-width: 481px) and (max-width: 768px) {
+    .subject-manager {
+      padding: 1.25rem;
+    }
+  
+    .subject-manager h3 {
+      font-size: 1.35rem;
+    }
+  
+    .subject-form {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+  
+    .subject-form input,
+    .subject-form select {
+      min-width: 120px;
+      padding: 0.65rem;
+      font-size: 0.9rem;
+    }
+  
+    .subject-form button {
+      padding: 0.65rem 1.25rem;
+      font-size: 0.9rem;
+    }
+  
+    .subject-list li {
+      padding: 0.85rem;
+    }
+  
+    .subject-list li span,
+    .subject-list li input {
+      font-size: 0.9rem;
+    }
+  
+    .subject-list li button {
+      padding: 0.5rem 0.85rem;
+      font-size: 0.85rem;
+    }
+  }
+  
+  /* Laptop (769px–1440px) */
+  @media (min-width: 769px) and (max-width: 1440px) {
+    .subject-manager {
+      padding: 1.5rem;
+    }
+  
+    .subject-manager h3 {
+      font-size: 1.5rem;
+    }
+  
+    .subject-form input,
+    .subject-form select {
+      padding: 0.75rem;
+      font-size: 0.95rem;
+    }
+  
+    .subject-form button {
+      padding: 0.75rem 1.5rem;
+      font-size: 0.95rem;
+    }
+  
+    .subject-list li {
+      padding: 1rem;
+    }
+  
+    .subject-list li span,
+    .subject-list li input {
+      font-size: 0.95rem;
+    }
+  
+    .subject-list li button {
+      padding: 0.5rem 1rem;
+      font-size: 0.9rem;
+    }
+  }
+  
+  /* Desktop (>1440px) */
+  @media (min-width: 1441px) {
+    .subject-manager {
+      padding: 2rem;
+    }
+  
+    .subject-manager h3 {
+      font-size: 1.6rem;
+    }
+  
+    .subject-form input,
+    .subject-form select {
+      padding: 0.8rem;
+      font-size: 1rem;
+    }
+  
+    .subject-form button {
+      padding: 0.8rem 1.75rem;
+      font-size: 1rem;
+    }
+  
+    .subject-list li {
+      padding: 1.25rem;
+    }
+  
+    .subject-list li span,
+    .subject-list li input {
+      font-size: 1rem;
+    }
+  
+    .subject-list li button {
+      padding: 0.6rem 1.25rem;
+      font-size: 0.95rem;
+    }
+  }
