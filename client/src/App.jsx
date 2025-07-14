@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
-import HODDashboard from './pages/HODDashboard';
-import StudentLogin from './components/StudentLogin';
+import HODDashboard from './pages/HODDashboard';//add new section
+import StudentLogin from './components/StudentLogin';//add new section
 
 // Student Login component
 // Now using dedicated StudentLogin component from components/StudentLogin.jsx
