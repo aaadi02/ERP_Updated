@@ -1,8 +1,0 @@
-# Disable AI features for college library frontend components
-college-library-frontend/src/components/*.js
-college-library-frontend/src/components/*.jsx
-college-library-frontend/src/components/*.ts
-college-library-frontend/src/components/*.tsx
-
-# Ignore specific files
-college-library-frontend/src/components/FacultyList.js
