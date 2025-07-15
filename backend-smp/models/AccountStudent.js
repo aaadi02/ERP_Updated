@@ -9,19 +9,32 @@ const accountStudentSchema = new Schema({
   lastName: { type: String, required: true },
   mobileNumber: { type: String },
   email: { type: String },
-  stream: { type: String, required: true },
+  stream: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: "Stream", 
+    required: true 
+  },
+  department: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "AcademicDepartment",
+    required: true
+  },
+  currentSemester: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Semester"
+  },
   semesterEntries: [
     {
       semesterRecord: {
         semester: {
-          _id: { type: String },
-          number: { type: Number },
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Semester"
         },
         subjects: [
           {
             subject: {
-              _id: { type: String },
-              name: { type: String },
+              type: mongoose.Schema.Types.ObjectId,
+              ref: "AdminSubject"
             },
             status: { type: String },
             marks: { type: Number, default: null },
@@ -33,6 +46,8 @@ const accountStudentSchema = new Schema({
       addedAt: { type: Date, default: Date.now },
     },
   ],
+}, {
+  timestamps: true
 });
 
 const AccountStudent = model('AccountStudent', accountStudentSchema);

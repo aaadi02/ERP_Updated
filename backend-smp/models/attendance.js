@@ -8,12 +8,12 @@ const attendanceSchema = new mongoose.Schema({
   },
   subject: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Subject", // FIX: model is registered as 'Subject'
+    ref: "AdminSubject", // Updated to match AdminSubject model
     required: true,
   },
   faculty: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Faculty", // FIX: model is registered as 'Faculty'
+    ref: "Faculty",
     required: true,
   },
   date: {
@@ -30,21 +30,22 @@ const attendanceSchema = new mongoose.Schema({
     enum: ["", "Sick", "Leave", "Unexcused", "Late", "Other"],
     default: "",
   },
+  semester: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Semester",
+    required: true
+  },
+  department: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "AcademicDepartment",
+    required: true
+  },
   createdAt: {
     type: Date,
     default: Date.now,
   },
-  subjects: [
-    {
-      subjectId: { type: mongoose.Schema.Types.ObjectId, ref: "Subject" },
-      name: String,
-      code: String,
-    },
-  ],
-  department: {
-    name: String,
-    code: String,
-  },
+}, {
+  timestamps: true
 });
 
 attendanceSchema.index({ student: 1, subject: 1, date: 1 }, { unique: true });

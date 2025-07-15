@@ -328,6 +328,18 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
           },
         ]
       : []),
+
+    // CC-specific functionality for users with CC role
+    ...(userData?.role === "cc" ? [
+      {
+        title: "Class Students",
+        icon: <Users size={20} />,
+        href: "/cc-class-students",
+        routeName: "cc_class_students",
+        isSection: true,
+        sectionTitle: "Class Management"
+      },
+    ] : []),
   ];
 
   const rolePermissions = rolePermissionsAndRoutes.reduce((acc, role) => {

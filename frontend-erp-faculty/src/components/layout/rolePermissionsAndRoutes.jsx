@@ -27,6 +27,7 @@ import FetchedTimetable from "../../pages/FetchedTimetable";
 import SentChargeHandover from "../../pages/SentChargeHandover";
 import FilesPage from "../../pages/FilesPage";
 import CCDashboard from "../../pages/CC/CCDashboard";
+import CCClassStudents from "../../pages/CC/CCClassStudents";
 import AcademicCalendar from "../../pages/HOD/AcademicCalendar";
 import FacultyAcademicCalendar from "../../pages/FacultyAcademicCalendar";
 import StudentFeedback from "../../components/StudentFeedback";
@@ -663,6 +664,7 @@ export const rolePermissionsAndRoutes = [
     role: "cc",
     permissions: [
       "cc_dashboard",
+      "cc_class_students",
       "profile",
       "mark_attendance",
       "payslip",
@@ -685,6 +687,18 @@ export const rolePermissionsAndRoutes = [
             routeName="cc_dashboard"
           >
             <CCDashboard userData={userData} />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/cc-class-students",
+        element: (isAuthenticated, userRole, userData) => (
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            userRole={userRole}
+            routeName="cc_class_students"
+          >
+            <CCClassStudents userData={userData} />
           </ProtectedRoute>
         ),
       },

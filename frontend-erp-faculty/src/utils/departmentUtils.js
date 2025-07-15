@@ -1,5 +1,40 @@
 // Utility functions for managing departments
 
+// Department name corrections for common typos
+const departmentCorrections = {
+  'eletronic enigneering': 'Electronics Engineering',
+  'eletronic engineering': 'Electronics Engineering', 
+  'electronic enigneering': 'Electronics Engineering',
+  'electronic engineering': 'Electronics Engineering',
+  'electronics': 'Electronics Engineering',
+  'computer scince': 'Computer Science Engineering',
+  'computer science': 'Computer Science Engineering',
+  'civil enigneering': 'Civil Engineering',
+  'civil': 'Civil Engineering',
+  'mechanical enigneering': 'Mechanical Engineering',
+  'mechanical': 'Mechanical Engineering',
+  'electrical enigneering': 'Electrical Engineering',
+  'electrical': 'Electrical Engineering',
+  'information tecnology': 'Information Technology',
+  'data scince': 'Data Science',
+  'account': 'Account Section'
+};
+
+// Function to correct department name
+export const correctDepartmentName = (departmentName) => {
+  if (!departmentName) return departmentName;
+  
+  const lowerDept = departmentName.toLowerCase().trim();
+  const corrected = departmentCorrections[lowerDept];
+  
+  if (corrected) {
+    console.log(`[DepartmentUtils] Corrected department: "${departmentName}" -> "${corrected}"`);
+    return corrected;
+  }
+  
+  return departmentName;
+};
+
 export const fetchDepartments = async () => {
   try {
     const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/superadmin/departments`);
@@ -178,39 +213,50 @@ export const fetchStudentDistribution = async () => {
 
 export const fetchFacultyByDepartment = async (department) => {
   try {
-    const normalizedDepartment = department ? department.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()) : "";
-    
-    if (!normalizedDepartment) {
+    if (!department) {
       throw new Error('Department is required');
     }
 
-    // Use the specific endpoint for fetching faculties by department
-    const url = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/faculty/department/${encodeURIComponent(normalizedDepartment)}`;
+    console.log(`[FetchFacultyByDepartment] Using exact department name: "${department}"`);
+    
+    // Use the specific endpoint for fetching faculties by department - NO CORRECTIONS
+    const url = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/faculty/department/${encodeURIComponent(department)}`;
+    
+    console.log(`[FetchFacultyByDepartment] Fetching from URL: ${url}`);
     
     const response = await fetch(url);
     
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[FetchFacultyByDepartment] API Error ${response.status}:`, errorText);
       throw new Error(`Failed to fetch faculty data: ${response.status}`);
     }
     
     const data = await response.json();
+    console.log(`[FetchFacultyByDepartment] API Response:`, data);
     
     // Handle the response structure from the specific endpoint
     let facultiesData = [];
+    let departmentName = department; // Use original department name
+    
     if (data.success && Array.isArray(data.data)) {
       facultiesData = data.data;
+      departmentName = data.department || department;
     } else if (Array.isArray(data.data?.faculties)) {
       facultiesData = data.data.faculties;
+      departmentName = data.data.department || department;
     } else if (Array.isArray(data.data)) {
       facultiesData = data.data;
     } else if (Array.isArray(data)) {
       facultiesData = data;
     }
     
+    console.log(`[FetchFacultyByDepartment] Retrieved ${facultiesData.length} faculties for department: ${departmentName}`);
+    
     return {
       success: true,
       faculties: facultiesData,
-      department: normalizedDepartment,
+      department: departmentName,
       count: facultiesData.length
     };
   } catch (error) {
@@ -231,16 +277,22 @@ export const fetchCCAssignmentsByDepartment = async (department) => {
       throw new Error('Department is required');
     }
 
+    console.log(`[FetchCCAssignmentsByDepartment] Using exact department: "${department}"`);
+
     const response = await fetch(
       `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/faculty/cc-assignments?department=${encodeURIComponent(department)}`
     );
     
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[FetchCCAssignmentsByDepartment] API Error ${response.status}:`, errorText);
       throw new Error(`Failed to fetch CC assignments: ${response.status}`);
     }
     
     const data = await response.json();
     const assignments = Array.isArray(data.data) ? data.data : [];
+    
+    console.log(`[FetchCCAssignmentsByDepartment] Retrieved ${assignments.length} CC assignments for department: ${department}`);
     
     return {
       success: true,
@@ -262,10 +314,10 @@ export const fetchSubjects = async (department = null) => {
   try {
     let url = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/subjects`;
     
-    // If department is provided, use the department-specific endpoint
+    // If department is provided, use the exact department name
     if (department) {
       url += `/by-department?department=${encodeURIComponent(department)}`;
-      console.log("[FetchSubjects] Fetching subjects for department:", department);
+      console.log("[FetchSubjects] Fetching subjects for exact department:", department);
     } else {
       console.log("[FetchSubjects] Fetching all subjects");
     }
@@ -277,6 +329,8 @@ export const fetchSubjects = async (department = null) => {
     });
     
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[FetchSubjects] API Error ${response.status}:`, errorText);
       throw new Error(`Failed to fetch subjects: ${response.status}`);
     }
     
