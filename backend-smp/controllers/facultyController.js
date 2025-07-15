@@ -692,14 +692,19 @@ const assignCC = async (req, res) => {
 
     // Department name corrections for common typos
     const departmentCorrections = {
-      'eletronic enigneering': 'Electronics',
-      'eletronic engineering': 'Electronics',
-      'electronic enigneering': 'Electronics',
-      'electronic engineering': 'Electronics',
-      'computer scince': 'Computer Science',
-      'civil enigneering': 'Civil',
-      'mechanical enigneering': 'Mechanical',
-      'electrical enigneering': 'Electrical',
+      'eletronic enigneering': 'Electronics Engineering',
+      'eletronic engineering': 'Electronics Engineering',
+      'electronic enigneering': 'Electronics Engineering',
+      'electronic engineering': 'Electronics Engineering',
+      'electronics': 'Electronics Engineering',
+      'computer scince': 'Computer Science Engineering',
+      'computer science': 'Computer Science Engineering',
+      'civil enigneering': 'Civil Engineering',
+      'civil': 'Civil Engineering',
+      'mechanical enigneering': 'Mechanical Engineering',
+      'mechanical': 'Mechanical Engineering',
+      'electrical enigneering': 'Electrical Engineering',
+      'electrical': 'Electrical Engineering',
       'information tecnology': 'Information Technology',
       'data scince': 'Data Science',
       'account': 'Account Section'
@@ -872,58 +877,84 @@ const getCCAssignments = async (req, res) => {
       });
     }
 
-    // Use the same department corrections as assignCC
-    const departmentCorrections = {
-      'eletronic enigneering': 'Electronics',
-      'eletronic engineering': 'Electronics',
-      'electronic enigneering': 'Electronics',
-      'electronic engineering': 'Electronics',
-      'computer scince': 'Computer Science',
-      'civil enigneering': 'Civil',
-      'mechanical enigneering': 'Mechanical',
-      'electrical enigneering': 'Electrical',
-      'information tecnology': 'Information Technology',
-      'data scince': 'Data Science',
-      'account': 'Account Section'
-    };
+    console.log("[GetCCAssignments] Original department query:", department);
 
-    const originalDepartment = department;
-    const lowerDept = department.toLowerCase();
-    
-    // Apply corrections if found, otherwise normalize to title case
-    if (departmentCorrections[lowerDept]) {
-      department = departmentCorrections[lowerDept];
-      console.log(`[GetCCAssignments] Department corrected from "${originalDepartment}" to "${department}"`);
-    } else {
-      department = department.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+    // Use the same multi-tier approach as the working faculty fetch API
+    let faculties = [];
+    let searchApproaches = [];
+
+    // Approach 1: Get all faculties and filter with JavaScript (this was working)
+    try {
+      console.log("[GetCCAssignments] Trying JavaScript filtering approach...");
+      
+      // First try to get faculties without population to avoid ObjectId casting errors
+      const allFaculties = await Faculty.find({
+        ccAssignments: { $exists: true, $ne: [] },
+      })
+        .select("firstName lastName ccAssignments department")
+        .lean();
+      
+      console.log("[GetCCAssignments] Total faculties with CC assignments:", allFaculties.length);
+      
+      // Filter faculties by department name (case insensitive partial match)
+      faculties = allFaculties.filter(faculty => {
+        const searchDept = department.toLowerCase();
+        
+        // Handle both string department and ObjectId department
+        let deptName = '';
+        if (typeof faculty.department === 'string') {
+          deptName = faculty.department.toLowerCase();
+        } else {
+          // For ObjectId departments, we'll skip population for now and match by string later
+          return false;
+        }
+        
+        return deptName.includes(searchDept) || 
+               searchDept.includes(deptName) ||
+               (deptName.includes('electronic') && (searchDept.includes('electronic') || searchDept.includes('eletronic'))) ||
+               (deptName.includes('eletronic') && (searchDept.includes('electronic') || searchDept.includes('eletronic'))) ||
+               (deptName.includes('computer') && searchDept.includes('computer')) ||
+               (deptName.includes('electrical') && searchDept.includes('electrical')) ||
+               (deptName.includes('mechanical') && searchDept.includes('mechanical')) ||
+               (deptName.includes('civil') && searchDept.includes('civil'));
+      });
+      
+      searchApproaches.push(`JavaScript filter: ${faculties.length} found from ${allFaculties.length} total`);
+      console.log(`[GetCCAssignments] JavaScript filtering found: ${faculties.length} faculties`);
+      
+      // Debug: Show what departments we found
+      const foundDepartments = [...new Set(allFaculties.map(f => {
+        if (typeof f.department === 'string') {
+          return f.department;
+        }
+        return 'ObjectId Department';
+      }))];
+      console.log("[GetCCAssignments] Available departments:", foundDepartments);
+      searchApproaches.push(`Available departments: ${foundDepartments.join(', ')}`);
+      
+    } catch (err) {
+      console.log("[GetCCAssignments] JavaScript filtering failed:", err.message);
+      searchApproaches.push(`JavaScript filtering failed: ${err.message}`);
     }
 
-    console.log("[GetCCAssignments] Querying department:", department);
-    
-    // Search for faculties with multiple department variations to handle inconsistencies
-    const departmentVariations = [
-      department,
-      originalDepartment,
-      originalDepartment.toLowerCase(),
-      originalDepartment.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
-    ];
-
-    const faculties = await Faculty.find({
-      $or: departmentVariations.map(dept => ({ department: dept })),
-      ccAssignments: { $exists: true, $ne: [] },
-    })
-      .select("firstName lastName ccAssignments department")
-      .lean();
-    
-    console.log("[GetCCAssignments] Found faculties:", faculties.length);
+    console.log("[GetCCAssignments] Total faculties found:", faculties.length);
+    console.log("[GetCCAssignments] Search approaches tried:", searchApproaches);
 
     const assignments = [];
     faculties.forEach((faculty) => {
       (faculty.ccAssignments || []).forEach((cc) => {
+        // Get department name - for CC assignments, use the faculty's string department
+        let departmentName = '';
+        if (typeof faculty.department === 'string') {
+          departmentName = faculty.department;
+        } else {
+          departmentName = department; // fallback to requested department
+        }
+        
         assignments.push({
           facultyId: faculty._id.toString(),
           name: `${faculty.firstName} ${faculty.lastName || ""}`.trim(),
-          department: faculty.department,
+          department: departmentName,
           academicYear: cc.academicYear,
           semester: cc.semester,
           section: cc.section,
@@ -936,6 +967,7 @@ const getCCAssignments = async (req, res) => {
     res.status(200).json({
       success: true,
       data: assignments,
+      searchApproaches: searchApproaches // Include debug info
     });
   } catch (error) {
     console.error("[GetCCAssignments] Error:", error);
@@ -1741,6 +1773,304 @@ const getStudentsByDepartment = async (req, res) => {
   }
 };
 
+// New function to get students with attendance data
+const getStudentsWithAttendance = async (req, res) => {
+  try {
+    const { department } = req.params;
+
+    if (!department) {
+      return res.status(400).json({
+        success: false,
+        message: "Department is required",
+      });
+    }
+
+    // Find the department by name
+    let departmentDoc = await Department.findOne({ 
+      name: { $regex: new RegExp(`^${department}$`, 'i') } 
+    });
+    
+    if (!departmentDoc) {
+      departmentDoc = await Department.findOne({ 
+        name: { $regex: new RegExp(department, 'i') } 
+      });
+    }
+
+    if (!departmentDoc) {
+      const allDepartments = await Department.find({}).select('name');
+      return res.status(404).json({
+        success: false,
+        message: `Department '${department}' not found`,
+        availableAcademicDepartments: allDepartments,
+      });
+    }
+
+    // Get students with all necessary fields including caste
+    const students = await Student.find({ 
+      department: departmentDoc._id,
+    })
+    .populate('department', 'name')
+    .select('firstName middleName lastName fatherName motherName email section semester department subjects studentId dateOfBirth mobileNumber gender photo casteCategory subCaste')
+    .lean();
+
+    // Get attendance data for all students
+    const studentIds = students.map(student => student._id);
+    
+    // Calculate attendance statistics for each student
+    const attendanceData = await Attendance.aggregate([
+      {
+        $match: {
+          student: { $in: studentIds }
+        }
+      },
+      {
+        $group: {
+          _id: "$student",
+          totalClasses: { $sum: 1 },
+          attendedClasses: {
+            $sum: {
+              $cond: [{ $eq: ["$status", "present"] }, 1, 0]
+            }
+          }
+        }
+      }
+    ]);
+
+    // Create a map for quick lookup of attendance data
+    const attendanceMap = {};
+    attendanceData.forEach(item => {
+      const percentage = item.totalClasses > 0 ? 
+        Math.round((item.attendedClasses / item.totalClasses) * 100) : 0;
+      attendanceMap[item._id.toString()] = {
+        totalClasses: item.totalClasses,
+        attendedClasses: item.attendedClasses,
+        attendancePercentage: percentage
+      };
+    });
+
+    // Transform student data and include attendance
+    const transformedStudents = students.map(student => ({
+      ...student,
+      name: [student.firstName, student.middleName, student.lastName]
+        .filter(Boolean)
+        .join(' '),
+      year: student.semester ? 
+        (student.semester.toString().includes('1') || student.semester.toString().includes('2') ? 1 :
+         student.semester.toString().includes('3') || student.semester.toString().includes('4') ? 2 :
+         student.semester.toString().includes('5') || student.semester.toString().includes('6') ? 3 :
+         student.semester.toString().includes('7') || student.semester.toString().includes('8') ? 4 : 1) : 1,
+      department: student.department?.name || department,
+      dob: student.dateOfBirth,
+      caste: student.casteCategory || 'Not Specified',
+      subCaste: student.subCaste || '',
+      attendance: attendanceMap[student._id.toString()] || {
+        totalClasses: 0,
+        attendedClasses: 0,
+        attendancePercentage: 0
+      }
+    }));
+
+    // Sort by caste category (General, OBC, SC, ST, etc.)
+    const casteOrder = ['General', 'OBC', 'SC', 'ST', 'EWS', 'Not Specified'];
+    transformedStudents.sort((a, b) => {
+      const aIndex = casteOrder.indexOf(a.caste);
+      const bIndex = casteOrder.indexOf(b.caste);
+      
+      // If caste not found in order array, put it at the end
+      const aOrder = aIndex === -1 ? casteOrder.length : aIndex;
+      const bOrder = bIndex === -1 ? casteOrder.length : bIndex;
+      
+      if (aOrder !== bOrder) {
+        return aOrder - bOrder;
+      }
+      
+      // If same caste, sort by name
+      return a.name.localeCompare(b.name);
+    });
+
+    // Calculate statistics
+    const stats = {
+      totalStudents: transformedStudents.length,
+      yearWiseCount: transformedStudents.reduce((acc, student) => {
+        const year = student.year || 'Unknown';
+        acc[year] = (acc[year] || 0) + 1;
+        return acc;
+      }, {}),
+      sectionWiseCount: transformedStudents.reduce((acc, student) => {
+        const section = student.section || 'Unknown';
+        acc[section] = (acc[section] || 0) + 1;
+        return acc;
+      }, {}),
+      casteWiseCount: transformedStudents.reduce((acc, student) => {
+        const caste = student.caste || 'Not Specified';
+        acc[caste] = (acc[caste] || 0) + 1;
+        return acc;
+      }, {}),
+      averageAttendance: transformedStudents.length > 0 ? 
+        Math.round(transformedStudents.reduce((sum, student) => 
+          sum + student.attendance.attendancePercentage, 0) / transformedStudents.length) : 0
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: "Students with attendance retrieved successfully",
+      data: {
+        students: transformedStudents,
+        stats,
+        department: departmentDoc.name
+      },
+    });
+  } catch (error) {
+    console.error("Get Students with Attendance Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+const getCCClassStudents = async (req, res) => {
+  try {
+    console.log("[GetCCClassStudents] Request from user:", req.user);
+    
+    // Get faculty ID from authenticated user
+    const facultyId = req.user.facultyId || req.user._id || req.user.id;
+    
+    if (!facultyId) {
+      return res.status(400).json({
+        success: false,
+        message: "Faculty ID is required"
+      });
+    }
+
+    // Get faculty details with CC assignments
+    const faculty = await Faculty.findById(facultyId)
+      .select("firstName lastName ccAssignments department")
+      .lean();
+
+    if (!faculty) {
+      return res.status(404).json({
+        success: false,
+        message: "Faculty not found"
+      });
+    }
+
+    console.log("[GetCCClassStudents] Faculty found:", faculty);
+
+    // Check if faculty has CC assignments
+    if (!faculty.ccAssignments || faculty.ccAssignments.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No CC assignments found for this faculty"
+      });
+    }
+
+    // Get the first CC assignment (for now, assuming one assignment per faculty)
+    const ccAssignment = faculty.ccAssignments[0];
+    console.log("[GetCCClassStudents] CC Assignment:", ccAssignment);
+
+    // Get faculty department
+    let departmentName = '';
+    if (typeof faculty.department === 'string') {
+      departmentName = faculty.department;
+    } else {
+      // If department is ObjectId, we need to get it from the assignment or faculty data
+      departmentName = faculty.department || '';
+    }
+
+    // Build query to find students matching CC's assignment
+    const studentQuery = {};
+    
+    // Match department
+    if (departmentName) {
+      studentQuery.department = new RegExp(departmentName, 'i');
+    }
+    
+    // Match academic year and semester from CC assignment
+    if (ccAssignment.academicYear) {
+      studentQuery.year = ccAssignment.academicYear;
+    }
+    
+    if (ccAssignment.semester) {
+      studentQuery.semester = ccAssignment.semester;
+    }
+    
+    if (ccAssignment.section) {
+      studentQuery.section = new RegExp(ccAssignment.section, 'i');
+    }
+
+    console.log("[GetCCClassStudents] Student query:", studentQuery);
+
+    // Fetch students matching the criteria
+    const students = await Student.find(studentQuery)
+      .select("name enrollmentNumber email phone year section department gender status dateOfBirth address casteCategory subCaste")
+      .lean();
+
+    console.log("[GetCCClassStudents] Students found:", students.length);
+
+    // Calculate attendance for each student
+    const studentsWithAttendance = await Promise.all(
+      students.map(async (student) => {
+        try {
+          // Get attendance records for this student
+          const attendanceRecords = await Attendance.find({
+            student: student._id
+          }).lean();
+
+          // Calculate attendance percentage
+          const totalClasses = attendanceRecords.length;
+          const presentClasses = attendanceRecords.filter(record => record.status === 'present').length;
+          const attendancePercentage = totalClasses > 0 ? Math.round((presentClasses / totalClasses) * 100) : 0;
+
+          return {
+            ...student,
+            attendancePercentage,
+            totalClasses,
+            presentClasses
+          };
+        } catch (err) {
+          console.error("[GetCCClassStudents] Error calculating attendance for student:", student._id, err);
+          return {
+            ...student,
+            attendancePercentage: 0,
+            totalClasses: 0,
+            presentClasses: 0
+          };
+        }
+      })
+    );
+
+    // Calculate average attendance
+    const totalAttendance = studentsWithAttendance.reduce((sum, student) => sum + student.attendancePercentage, 0);
+    const averageAttendance = studentsWithAttendance.length > 0 ? Math.round(totalAttendance / studentsWithAttendance.length) : 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        students: studentsWithAttendance,
+        averageAttendance,
+        ccAssignment: {
+          facultyName: `${faculty.firstName} ${faculty.lastName || ""}`.trim(),
+          department: departmentName,
+          academicYear: ccAssignment.academicYear,
+          semester: ccAssignment.semester,
+          section: ccAssignment.section
+        }
+      },
+      message: `Found ${studentsWithAttendance.length} students for CC assignment`
+    });
+
+  } catch (error) {
+    console.error("[GetCCClassStudents] Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+};
+
 export {
   facultyRegister,
   staffLogin,
@@ -1761,4 +2091,6 @@ export {
   getStudentsBySubject,
   markAttendance,
   getStudentsByDepartment,
+  getStudentsWithAttendance,
+  getCCClassStudents,
 };

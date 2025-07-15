@@ -9,12 +9,16 @@ const DepartmentStudents = ({ userData }) => {
   const [selectedYear, setSelectedYear] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterBy, setFilterBy] = useState("all");
+  const [selectedCaste, setSelectedCaste] = useState("all");
+  const [selectedSubCaste, setSelectedSubCaste] = useState("all");
   const [stats, setStats] = useState({
     totalStudents: 0,
     activeStudents: 0,
     graduatedStudents: 0,
     yearWiseData: {},
-    sectionWiseData: {}
+    sectionWiseData: {},
+    casteWiseData: {},
+    averageAttendance: 0
   });
 
   // Available years for current students (1st to 4th year typically)
@@ -22,9 +26,27 @@ const DepartmentStudents = ({ userData }) => {
     "1", "2", "3", "4", "5" // Year levels instead of academic years
   ];
 
+  // Available caste categories for filtering
+  const casteCategories = [
+    "General", "OBC", "SC", "ST", "EWS", "Not Specified"
+  ];
+
   useEffect(() => {
     fetchDepartmentStudents();
   }, [userData?.department]);
+
+  // Keyboard shortcut for search (Ctrl+F)
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.ctrlKey && event.key === 'f') {
+        event.preventDefault();
+        document.querySelector('input[placeholder*="Search by name"]')?.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const fetchDepartmentStudents = async () => {
     try {
@@ -51,7 +73,7 @@ const DepartmentStudents = ({ userData }) => {
       }
       
       const response = await axios.get(
-        `http://localhost:5000/api/faculty/students/department/${encodeURIComponent(userDepartment)}`,
+        `http://localhost:5000/api/faculty/students-attendance/department/${encodeURIComponent(userDepartment)}`,
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -69,7 +91,9 @@ const DepartmentStudents = ({ userData }) => {
             activeStudents: 0,
             graduatedStudents: 0,
             yearWiseData: {},
-            sectionWiseData: {}
+            sectionWiseData: {},
+            casteWiseData: {},
+            averageAttendance: 0
           });
           setError("No students found for this department. This could be normal if no students are currently enrolled.");
           setLoading(false);
@@ -92,11 +116,27 @@ const DepartmentStudents = ({ userData }) => {
           contactNumber: student.mobileNumber,
           gender: student.gender,
           fatherName: student.fatherName,
-          motherName: student.motherName
+          motherName: student.motherName,
+          caste: student.caste || 'Not Specified',
+          subCaste: student.subCaste || '',
+          attendance: student.attendance || {
+            totalClasses: 0,
+            attendedClasses: 0,
+            attendancePercentage: 0
+          }
         }));
 
         setStudentsData(transformedStudents);
-        calculateStats(transformedStudents, apiStats);
+        // Use stats from backend directly since it includes caste data
+        setStats(apiStats || {
+          totalStudents: transformedStudents.length,
+          activeStudents: transformedStudents.filter(s => s.status === "active").length,
+          graduatedStudents: transformedStudents.filter(s => s.status === "graduated").length,
+          yearWiseData: {},
+          sectionWiseData: {},
+          casteWiseData: {},
+          averageAttendance: 0
+        });
       } else {
         setError(response.data.message || "Failed to fetch students data");
       }
@@ -123,7 +163,9 @@ const DepartmentStudents = ({ userData }) => {
           activeStudents: 0,
           graduatedStudents: 0,
           yearWiseData: {},
-          sectionWiseData: {}
+          sectionWiseData: {},
+          casteWiseData: {},
+          averageAttendance: 0
         });
       } else {
         setError(err.response?.data?.message || "Failed to load students data. Please try again later.");
@@ -180,18 +222,27 @@ const DepartmentStudents = ({ userData }) => {
   const filteredStudents = studentsData.filter(student => {
     const matchesSearch = student.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          student.rollNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.email?.toLowerCase().includes(searchTerm.toLowerCase());
+                         student.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         student.fatherName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         student.contactNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         student.caste?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         student.subCaste?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         student.section?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesYear = !selectedYear || student.year?.toString() === selectedYear;
     
     const matchesFilter = filterBy === "all" || student.status === filterBy;
     
-    return matchesSearch && matchesYear && matchesFilter;
+    const matchesCaste = selectedCaste === "all" || student.caste === selectedCaste;
+    
+    const matchesSubCaste = selectedSubCaste === "all" || student.subCaste === selectedSubCaste;
+    
+    return matchesSearch && matchesYear && matchesFilter && matchesCaste && matchesSubCaste;
   });
 
   const exportData = () => {
     const csvContent = [
-      ["Name", "Roll Number", "Email", "Year", "Section", "Department", "Contact", "Gender", "Father Name"],
+      ["Name", "Roll Number", "Email", "Year", "Section", "Department", "Contact", "Gender", "Father Name", "Caste", "Sub Caste", "Attendance %"],
       ...filteredStudents.map(student => [
         student.name || "",
         student.rollNumber || "",
@@ -201,7 +252,10 @@ const DepartmentStudents = ({ userData }) => {
         student.department || "",
         student.contactNumber || "",
         student.gender || "",
-        student.fatherName || ""
+        student.fatherName || "",
+        student.caste || "",
+        student.subCaste || "",
+        student.attendance?.attendancePercentage || 0
       ])
     ].map(row => row.join(",")).join("\n");
 
@@ -209,9 +263,18 @@ const DepartmentStudents = ({ userData }) => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${userData?.department}_students_year_${selectedYear || 'all'}.csv`;
+    a.download = `${userData?.department}_students_${selectedYear ? `year_${selectedYear}_` : ''}${selectedCaste !== 'all' ? `caste_${selectedCaste}_` : ''}${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
+  };
+
+  // Clear all filters function
+  const clearFilters = () => {
+    setSearchTerm("");
+    setSelectedYear("");
+    setFilterBy("all");
+    setSelectedCaste("all");
+    setSelectedSubCaste("all");
   };
 
   if (loading) {
@@ -256,7 +319,7 @@ const DepartmentStudents = ({ userData }) => {
           )}
 
           {/* Statistics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
             <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg">
               <div className="flex items-center justify-between">
                 <div>
@@ -290,17 +353,36 @@ const DepartmentStudents = ({ userData }) => {
             <div className="bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl p-6 text-white shadow-lg">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-orange-100 text-sm font-medium">Sections</p>
-                  <p className="text-3xl font-bold">{Object.keys(stats.sectionWiseData || {}).length}</p>
+                  <p className="text-orange-100 text-sm font-medium">Avg Attendance</p>
+                  <p className="text-3xl font-bold">{stats.averageAttendance || 0}%</p>
                 </div>
                 <Filter className="h-12 w-12 text-orange-200" />
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-pink-500 to-rose-600 rounded-2xl p-6 text-white shadow-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-pink-100 text-sm font-medium">Caste Categories</p>
+                  <p className="text-3xl font-bold">{Object.keys(stats.casteWiseData || {}).length}</p>
+                </div>
+                <Users className="h-12 w-12 text-pink-200" />
               </div>
             </div>
           </div>
 
           {/* Filters and Search */}
           <div className="backdrop-blur-xl bg-white/80 border border-white/20 rounded-3xl shadow-2xl p-8 mb-8">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-800">🔍 Search & Filters</h3>
+              <button
+                onClick={clearFilters}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors duration-200 text-sm font-medium"
+              >
+                Clear All Filters
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
               {/* Search */}
               <div className="group">
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
@@ -312,7 +394,7 @@ const DepartmentStudents = ({ userData }) => {
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search by name, roll number, or email..."
+                    placeholder="Search by name, roll, email, caste, subcaste, section..."
                     className="w-full pl-10 pr-4 py-4 bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 hover:bg-white/90 focus:bg-white shadow-sm text-gray-700 font-medium"
                   />
                 </div>
@@ -357,6 +439,47 @@ const DepartmentStudents = ({ userData }) => {
                 </div>
               </div>
 
+              {/* Caste Filter */}
+              <div className="group">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  🏷️ Filter by Caste
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedCaste}
+                    onChange={(e) => setSelectedCaste(e.target.value)}
+                    className="w-full px-4 py-4 bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 hover:bg-white/90 focus:bg-white shadow-sm text-gray-700 font-medium appearance-none"
+                  >
+                    <option value="all">All Castes</option>
+                    {casteCategories.map(caste => (
+                      <option key={caste} value={caste}>{caste}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Sub Caste Filter */}
+              <div className="group">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  🏷️ Filter by Sub Caste
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedSubCaste}
+                    onChange={(e) => setSelectedSubCaste(e.target.value)}
+                    className="w-full px-4 py-4 bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 hover:bg-white/90 focus:bg-white shadow-sm text-gray-700 font-medium appearance-none"
+                  >
+                    <option value="all">All Sub Castes</option>
+                    {/* Dynamic subcaste options based on available subcastes */}
+                    {[...new Set(studentsData.map(student => student.subCaste).filter(Boolean))].map(subCaste => (
+                      <option key={subCaste} value={subCaste}>{subCaste}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5 pointer-events-none" />
+                </div>
+              </div>
+
               {/* Export Button */}
               <div className="group">
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
@@ -380,9 +503,16 @@ const DepartmentStudents = ({ userData }) => {
                 <h3 className="text-2xl font-bold text-gray-800">
                   👥 Current Students List
                 </h3>
-                <span className="text-sm bg-blue-100 px-4 py-2 rounded-full font-medium text-blue-700">
-                  {filteredStudents.length} students found
-                </span>
+                <div className="flex items-center space-x-4">
+                  {(searchTerm || selectedYear || filterBy !== "all" || selectedCaste !== "all" || selectedSubCaste !== "all") && (
+                    <span className="text-xs bg-yellow-100 px-3 py-1 rounded-full font-medium text-yellow-700">
+                      Filtered Results
+                    </span>
+                  )}
+                  <span className="text-sm bg-blue-100 px-4 py-2 rounded-full font-medium text-blue-700">
+                    {filteredStudents.length} of {studentsData.length} students
+                  </span>
+                </div>
               </div>
 
               {filteredStudents.length === 0 ? (
@@ -390,8 +520,8 @@ const DepartmentStudents = ({ userData }) => {
                   <div className="text-gray-400 text-6xl mb-4">👥</div>
                   <h3 className="text-xl font-semibold text-gray-600 mb-2">No Students Found</h3>
                   <p className="text-gray-500">
-                    {searchTerm || selectedYear || filterBy !== "all" 
-                      ? "Try adjusting your search criteria"
+                    {searchTerm || selectedYear || filterBy !== "all" || selectedCaste !== "all" || selectedSubCaste !== "all"
+                      ? "Try adjusting your search criteria or filters"
                       : "No current students are enrolled in this department"
                     }
                   </p>
@@ -408,6 +538,9 @@ const DepartmentStudents = ({ userData }) => {
                         <th className="text-left py-4 px-6 font-semibold text-gray-700">📝 Section</th>
                         <th className="text-left py-4 px-6 font-semibold text-gray-700">📞 Contact</th>
                         <th className="text-left py-4 px-6 font-semibold text-gray-700">👥 Gender</th>
+                        <th className="text-left py-4 px-6 font-semibold text-gray-700">🏷️ Caste</th>
+                        <th className="text-left py-4 px-6 font-semibold text-gray-700">🏷️ Sub Caste</th>
+                        <th className="text-left py-4 px-6 font-semibold text-gray-700">📊 Attendance</th>
                         <th className="text-left py-4 px-6 font-semibold text-gray-700">📋 Status</th>
                       </tr>
                     </thead>
@@ -455,6 +588,39 @@ const DepartmentStudents = ({ userData }) => {
                             }`}>
                               {student.gender || 'N/A'}
                             </span>
+                          </td>
+                          <td className="py-4 px-6">
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                              student.caste === 'General' ? 'bg-purple-100 text-purple-800' :
+                              student.caste === 'OBC' ? 'bg-yellow-100 text-yellow-800' :
+                              student.caste === 'SC' ? 'bg-green-100 text-green-800' :
+                              student.caste === 'ST' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {student.caste || 'Not Specified'}
+                            </span>
+                          </td>
+                          <td className="py-4 px-6">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              student.subCaste ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-500'
+                            }`}>
+                              {student.subCaste || 'Not Specified'}
+                            </span>
+                          </td>
+                          <td className="py-4 px-6">
+                            <div className="flex items-center space-x-2">
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm ${
+                                student.attendance?.attendancePercentage >= 75 ? 'bg-green-500' :
+                                student.attendance?.attendancePercentage >= 60 ? 'bg-yellow-500' :
+                                'bg-red-500'
+                              }`}>
+                                {student.attendance?.attendancePercentage || 0}%
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                <div>{student.attendance?.attendedClasses || 0}/{student.attendance?.totalClasses || 0}</div>
+                                <div>Classes</div>
+                              </div>
+                            </div>
                           </td>
                           <td className="py-4 px-6">
                             <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${

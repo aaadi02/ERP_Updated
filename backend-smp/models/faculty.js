@@ -5,9 +5,17 @@ const facultySchema = new mongoose.Schema({
   ccAssignments: [
     {
       academicYear: { type: String, required: true },
-      semester: { type: String, required: true },
+      semester: { 
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Semester",
+        required: true 
+      },
       section: { type: String, required: true },
-      department: { type: String, required: true },
+      department: { 
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "AcademicDepartment",
+        required: true 
+      },
       assignedAt: { type: Date, default: Date.now },
     },
   ],
@@ -62,7 +70,8 @@ const facultySchema = new mongoose.Schema({
     default: null,
   },
   department: {
-    type: String,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "AcademicDepartment",
     required: true,
   },
   address: {

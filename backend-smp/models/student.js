@@ -71,12 +71,12 @@ const studentSchema = new mongoose.Schema({
   },
   department: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Department",
+    ref: "AcademicDepartment", // Updated to match AcademicDepartment
     required: true,
   },
   subjects: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Subject",
+    ref: "AdminSubject", // Updated to match AdminSubject
   }],
   semester: {
     type: mongoose.Schema.Types.ObjectId,
@@ -111,7 +111,7 @@ const studentSchema = new mongoose.Schema({
     subjects: [{
       subject: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Subject",
+        ref: "AdminSubject", // Updated to match AdminSubject
       },
       status: String,
       marks: Number,
@@ -126,7 +126,7 @@ const studentSchema = new mongoose.Schema({
   },
   backlogs: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Subject",
+    ref: "AdminSubject", // Updated to match AdminSubject
   }],
   studentId: {
     type: String,

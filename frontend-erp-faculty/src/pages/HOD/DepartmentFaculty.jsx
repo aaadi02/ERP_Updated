@@ -94,15 +94,19 @@ export default function DepartmentFaculty({ userData }) {
         setLoading(true);
         setError(null);
 
+        console.log("[DepartmentFaculty] Calling fetchFacultyByDepartment with:", department);
         const result = await fetchFacultyByDepartment(department);
+        console.log("[DepartmentFaculty] fetchFacultyByDepartment result:", result);
         
         if (result.success) {
           console.log("[DepartmentFaculty] Successfully fetched", result.count, "faculty members for", result.department);
-          setFaculties(result.faculties);
+          console.log("[DepartmentFaculty] Faculty data structure:", result.faculties.slice(0, 2));
+          setFaculties(result.faculties || []);
           setUserDepartment(result.department);
           // Set filter department to user's department to ensure only their department's faculty is shown
           setFilterDepartment(result.department);
         } else {
+          console.error("[DepartmentFaculty] fetchFacultyByDepartment failed:", result.error);
           throw new Error(result.error || 'Failed to fetch faculty data');
         }
       } catch (err) {
@@ -121,6 +125,12 @@ export default function DepartmentFaculty({ userData }) {
   useEffect(() => {
     const currentDepartment = userData?.department;
 
+    console.log("[DepartmentFaculty] useEffect triggered with userData:", {
+      userData: userData,
+      department: currentDepartment,
+      userDataKeys: userData ? Object.keys(userData) : 'No userData'
+    });
+
     // Only proceed if we have a valid department from userData
     if (!currentDepartment) {
       console.log("[DepartmentFaculty] No department in userData, skipping fetch");
@@ -131,6 +141,13 @@ export default function DepartmentFaculty({ userData }) {
     // Normalize the department name for consistent comparison
     const normalizedCurrentDept = normalizeDepartment(currentDepartment);
     const normalizedLastFetched = normalizeDepartment(lastFetchedDepartment);
+
+    console.log("[DepartmentFaculty] Department comparison:", {
+      current: normalizedCurrentDept,
+      lastFetched: normalizedLastFetched,
+      areEqual: normalizedCurrentDept === normalizedLastFetched,
+      fetchingRef: fetchingRef.current
+    });
 
     // Skip if we've already fetched for this department or if currently fetching
     if (normalizedCurrentDept === normalizedLastFetched || fetchingRef.current) {
@@ -155,38 +172,20 @@ export default function DepartmentFaculty({ userData }) {
         return;
       }
 
-      // Try multiple department name variations to ensure we get all assignments
-      const departmentVariations = [
-        department, // Original department name
-        userDepartment, // Normalized department name
-        department.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()) // Title case
-      ].filter(Boolean);
-
-      console.log("[CCAssignmentsFetch] Trying department variations:", departmentVariations);
-
-      let assignmentsFetched = false;
-
-      for (const deptName of departmentVariations) {
-        if (assignmentsFetched) break;
+      console.log("[CCAssignmentsFetch] Fetching assignments for exact department:", department);
+      
+      try {
+        const result = await fetchCCAssignmentsByDepartment(department);
         
-        try {
-          console.log(`[CCAssignmentsFetch] Fetching assignments for: "${deptName}"`);
-          const result = await fetchCCAssignmentsByDepartment(deptName);
-          
-          if (result.success) {
-            console.log(`[CCAssignmentsFetch] Result for ${deptName}:`, result.assignments.length, "assignments");
-            if (result.assignments.length > 0) {
-              setCCAssignments(result.assignments);
-              assignmentsFetched = true;
-            }
-          }
-        } catch (err) {
-          console.warn(`[CCAssignmentsFetch] Failed for department ${deptName}:`, err);
+        if (result.success) {
+          console.log(`[CCAssignmentsFetch] Successfully fetched ${result.assignments.length} assignments`);
+          setCCAssignments(result.assignments);
+        } else {
+          console.log("[CCAssignmentsFetch] No assignments found");
+          setCCAssignments([]);
         }
-      }
-
-      if (!assignmentsFetched) {
-        console.log("[CCAssignmentsFetch] No assignments found for any department variation");
+      } catch (err) {
+        console.warn(`[CCAssignmentsFetch] Failed:`, err);
         setCCAssignments([]);
       }
     } catch (err) {
@@ -204,7 +203,7 @@ export default function DepartmentFaculty({ userData }) {
         return;
       }
 
-      console.log("[SubjectsFetch] Fetching subjects for department:", department);
+      console.log("[SubjectsFetch] Fetching subjects for exact department:", department);
       const result = await fetchSubjects(department);
       
       if (result.success) {
@@ -252,19 +251,10 @@ export default function DepartmentFaculty({ userData }) {
 
     const matchesType = filterType === "all" || faculty.type === filterType;
     
-    // Ensure only user's department faculty is shown - flexible department matching
-    const facultyDept = (faculty.department || '').toLowerCase().trim();
-    const userDept = (userDepartment || '').toLowerCase().trim();
-    const matchesDepartment = facultyDept && userDept && (
-      facultyDept === userDept ||
-      (facultyDept.includes('electronic') && userDept.includes('electronic')) ||
-      (facultyDept.includes('eletronic') && userDept.includes('eletronic'))
-    );
-
-    // Additional safety check - if no userDepartment is set, don't show any faculty
-    if (!userDepartment) {
-      return false;
-    }
+    // Since we're fetching faculty by the user's exact department, 
+    // all returned faculty should belong to that department
+    // No need for complex department matching - just show all fetched faculty
+    const matchesDepartment = true;
 
     return matchesSearch && matchesType && matchesDepartment;
   });
@@ -292,14 +282,29 @@ export default function DepartmentFaculty({ userData }) {
     filteredCount: filteredFaculties.length,
     sortedCount: sortedFaculties.length,
     userDepartment,
+    userDataDepartment: userData?.department,
     filterType,
     searchTerm,
     subjectsCount: subjects.length,
+    loadingState: loading,
+    errorState: error,
+    lastFetchedDepartment,
+    isFetching,
+    fetchingRefCurrent: fetchingRef.current,
+    facultySample: faculties.slice(0, 2).map(f => ({ 
+      id: f._id, 
+      name: f.name, 
+      dept: f.department,
+      type: f.type,
+      email: f.email
+    })),
     subjectsPreview: subjects.slice(0, 3).map(s => ({ name: s.name, dept: s.department })),
-    allFacultyDepartments: faculties.map(f => f.department),
+    allFacultyDepartments: [...new Set(faculties.map(f => f.department))],
     facultiesPreview: faculties.slice(0, 3).map(f => ({ id: f._id, name: f.name, dept: f.department })),
     filteredFacultiesPreview: filteredFaculties.slice(0, 3).map(f => ({ id: f._id, name: f.name, dept: f.department })),
-    facultyStructure: faculties.length > 0 ? Object.keys(faculties[0]) : []
+    facultyStructure: faculties.length > 0 ? Object.keys(faculties[0]) : [],
+    fetchAllDataFunction: typeof fetchAllData,
+    ccAssignmentsCount: ccAssignments.length
   });
 
   const handleExpandFaculty = (facultyId) => {
@@ -823,6 +828,11 @@ export default function DepartmentFaculty({ userData }) {
           <p className="text-slate-600 mb-6">
             Please ensure you are logged in with a valid department assignment to view faculty data.
           </p>
+          <div className="text-sm text-slate-500 bg-slate-100 p-3 rounded-lg text-left">
+            <strong>Debug Info:</strong><br />
+            userData: {JSON.stringify(userData, null, 2)}<br />
+            department: {userData?.department || 'undefined'}
+          </div>
         </div>
       </div>
     );

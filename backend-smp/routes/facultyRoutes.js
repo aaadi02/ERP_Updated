@@ -12,6 +12,7 @@ import {
   getLastEmployeeId,
   assignCC,
   getCCAssignments,
+  getCCClassStudents,
   deleteCCAssignment,
   removeHodRole,
   removePrincipalRole,
@@ -20,6 +21,7 @@ import {
   getFacultySubjects,
   getStudentsBySubject,
   getStudentsByDepartment,
+  getStudentsWithAttendance,
 } from "../controllers/facultyController.js";
 import {
   getHodHistory,
@@ -57,6 +59,7 @@ router.post("/assign-hod", assignHod);
 router.post("/assign-principal", assignPrincipal);
 router.post("/assign-cc", assignCC);
 router.get("/cc-assignments", getCCAssignments);
+router.get("/get-cc-class-students", protect, getCCClassStudents);
 router.post("/delete-cc-assignment", deleteCCAssignment);
 router.patch("/remove-hod/:facultyId", removeHodRole);
 router.patch("/remove-principal/:facultyId", removePrincipalRole);
@@ -65,6 +68,7 @@ router.post("/unassign-subject", unassignSubject);
 router.get("/subjects/:employeeId", getFacultySubjects);
 router.get("/students/subject/:subjectId", getStudentsBySubject);
 router.get("/students/department/:department", protect, getStudentsByDepartment);
+router.get("/students-attendance/department/:department", protect, getStudentsWithAttendance); // New route for students with attendance and caste sorting
 
 // Temporary test route without authentication
 router.get("/debug/students/:department", async (req, res) => {
@@ -217,85 +221,134 @@ router.get("/debug/query-test/:department", async (req, res) => {
 router.get("/department/:departmentName", async (req, res) => {
   try {
     const { departmentName } = req.params;
-    console.log("[FacultiesByDepartment] Fetching faculties for department:", departmentName);
+    console.log("[FacultiesByDepartment] Fetching faculties for exact department:", departmentName);
 
-    // Department name corrections for common typos
-    const departmentCorrections = {
-      'eletronic enigneering': 'Electronics',
-      'electronics engineering': 'Electronics',
-      'electronics': 'Electronics',
-      'computer science engineering': 'Computer Science',
-      'computer science': 'Computer Science',
-      'mechanical engineering': 'Mechanical',
-      'mechanical': 'Mechanical',
-      'civil engineering': 'Civil',
-      'civil': 'Civil',
-      'electrical engineering': 'Electrical',
-      'electrical': 'Electrical'
-    };
+    let faculties = [];
+    let searchApproaches = [];
 
-    // Try to correct department name
-    const normalizedDeptName = departmentName.toLowerCase().trim();
-    const correctedDeptName = departmentCorrections[normalizedDeptName] || departmentName;
-
-    console.log("[FacultiesByDepartment] Department name correction:", {
-      original: departmentName,
-      normalized: normalizedDeptName,
-      corrected: correctedDeptName
-    });
-
-    // Find faculties using multiple department name variations
-    let faculties;
-    let populationError = null;
-    
-    // Create query with multiple department name variations
-    const departmentVariations = [
-      departmentName,          // Original input
-      correctedDeptName,       // Corrected name
-      normalizedDeptName       // Normalized name
+    // Approach 1: Try different direct string matches
+    const directMatches = [
+      departmentName, // exact as provided
+      departmentName.toLowerCase(),
+      departmentName.toUpperCase(),
+      'Computer Science',
+      'Electrical', 
+      'Mechanical',
+      'Electronics Engineering'
     ];
 
-    // Remove duplicates and create case-insensitive regex patterns
-    const uniqueVariations = [...new Set(departmentVariations)];
-    const departmentQuery = {
-      $or: uniqueVariations.map(variation => ({
-        department: { $regex: new RegExp(`^${variation}$`, 'i') }
-      }))
-    };
-
-    console.log("[FacultiesByDepartment] Using query:", JSON.stringify(departmentQuery, null, 2));
-    
-    try {
-      // Try with population of subjectsTaught first
-      console.log("[FacultiesByDepartment] Attempting population of subjectsTaught...");
-      faculties = await Faculty.find(departmentQuery)
-        .populate({
-          path: 'subjectsTaught',
-          model: 'AdminSubject'
+    for (const matchTerm of directMatches) {
+      if (faculties.length > 0) break;
+      
+      try {
+        console.log(`[FacultiesByDepartment] Trying direct match: "${matchTerm}"`);
+        faculties = await Faculty.find({
+          department: matchTerm
         })
-        .sort({ firstName: 1 })
-        .lean();
-      console.log("[FacultiesByDepartment] Population successful");
-    } catch (err) {
-      // If population fails due to bad data, try again without population
-      populationError = err.message;
-      console.warn("[FacultiesByDepartment] Population failed, trying without:", err.message);
-      faculties = await Faculty.find(departmentQuery)
-        .sort({ firstName: 1 })
-        .lean();
+          .populate({
+            path: 'subjectsTaught',
+            model: 'AdminSubject',
+            select: 'name'
+          })
+          .sort({ firstName: 1 })
+          .lean();
+        
+        if (faculties.length > 0) {
+          searchApproaches.push(`Direct match "${matchTerm}": ${faculties.length} found`);
+          console.log(`[FacultiesByDepartment] Direct match "${matchTerm}" found: ${faculties.length} faculties`);
+          break;
+        }
+      } catch (err) {
+        console.log(`[FacultiesByDepartment] Direct match "${matchTerm}" failed:`, err.message);
+        searchApproaches.push(`Direct match "${matchTerm}" failed: ${err.message}`);
+      }
+    }
+
+    // Approach 2: Get all faculties and filter in JavaScript (fallback)
+    if (faculties.length === 0) {
+      try {
+        console.log("[FacultiesByDepartment] Trying to get all faculties for filtering...");
+        const allFaculties = await Faculty.find({})
+          .populate({
+            path: 'subjectsTaught',
+            model: 'AdminSubject',
+            select: 'name'
+          })
+          .sort({ firstName: 1 })
+          .lean();
+        
+        // Filter faculties by department name (case insensitive partial match)
+        faculties = allFaculties.filter(faculty => {
+          const facultyDept = (faculty.department || '').toString().toLowerCase();
+          const searchDept = departmentName.toLowerCase();
+          
+          return facultyDept.includes(searchDept) || 
+                 searchDept.includes(facultyDept) ||
+                 (facultyDept.includes('computer') && searchDept.includes('computer')) ||
+                 (facultyDept.includes('electrical') && (searchDept.includes('electrical') || searchDept.includes('eletronic'))) ||
+                 (facultyDept.includes('mechanical') && searchDept.includes('mechanical')) ||
+                 (facultyDept.includes('electronics') && (searchDept.includes('electronics') || searchDept.includes('eletronic')));
+        });
+        
+        searchApproaches.push(`JavaScript filter: ${faculties.length} found from ${allFaculties.length} total`);
+        console.log(`[FacultiesByDepartment] JavaScript filtering found: ${faculties.length} faculties from ${allFaculties.length} total`);
+        
+        // Debug: Show what departments we found
+        const foundDepartments = [...new Set(allFaculties.map(f => f.department))];
+        console.log("[FacultiesByDepartment] Available departments:", foundDepartments);
+        searchApproaches.push(`Available departments: ${foundDepartments.join(', ')}`);
+        
+      } catch (err) {
+        console.log("[FacultiesByDepartment] JavaScript filtering failed:", err.message);
+        searchApproaches.push(`JavaScript filtering failed: ${err.message}`);
+      }
+    }
+
+    // Approach 3: Try with AcademicDepartment ObjectId approach (if still no match)
+    if (faculties.length === 0) {
+      try {
+        console.log("[FacultiesByDepartment] Trying ObjectId approach...");
+        const AcademicDepartment = await import("../models/AcademicDepartment.js").then(m => m.default);
+        
+        const academicDepartments = await AcademicDepartment.find({});
+        console.log("[FacultiesByDepartment] Available academic departments:", academicDepartments.map(d => d.name));
+        
+        // Find academic department with case-insensitive partial match
+        let academicDepartment = academicDepartments.find(dept => 
+          dept.name.toLowerCase().includes(departmentName.toLowerCase()) ||
+          departmentName.toLowerCase().includes(dept.name.toLowerCase())
+        );
+
+        if (academicDepartment) {
+          console.log('[FacultiesByDepartment] Found academic department:', academicDepartment.name);
+          
+          faculties = await Faculty.find({ department: academicDepartment._id })
+            .populate({
+              path: 'department',
+              model: 'AcademicDepartment', 
+              select: 'name'
+            })
+            .populate({
+              path: 'subjectsTaught',
+              model: 'AdminSubject',
+              select: 'name'
+            })
+            .sort({ firstName: 1 })
+            .lean();
+            
+          searchApproaches.push(`ObjectId match with "${academicDepartment.name}": ${faculties.length} found`);
+          console.log(`[FacultiesByDepartment] ObjectId approach found: ${faculties.length} faculties`);
+        } else {
+          searchApproaches.push('ObjectId approach: No matching academic department found');
+        }
+      } catch (err) {
+        console.log("[FacultiesByDepartment] ObjectId approach failed:", err.message);
+        searchApproaches.push(`ObjectId approach failed: ${err.message}`);
+      }
     }
     
-    console.log("[FacultiesByDepartment] Faculties found:", faculties.length);
-
-    // Debug logging for subjects
-    faculties.forEach((faculty, index) => {
-      console.log(`[FacultiesByDepartment] Faculty ${index + 1} (${faculty.employeeId}):`, {
-        name: faculty.name || `${faculty.firstName} ${faculty.lastName}`,
-        subjectsTaught: faculty.subjectsTaught,
-        subjectsTaughtLength: Array.isArray(faculty.subjectsTaught) ? faculty.subjectsTaught.length : 'Not array',
-        subjectsTaughtType: typeof faculty.subjectsTaught
-      });
-    });
+    console.log("[FacultiesByDepartment] Total faculties found:", faculties.length);
+    console.log("[FacultiesByDepartment] Search approaches tried:", searchApproaches);
 
     // Format faculties with proper name handling and full data
     const formattedFaculties = faculties.map(faculty => {
@@ -315,7 +368,6 @@ router.get("/department/:departmentName", async (req, res) => {
         }
         
         // Use the maximum of stored experience and calculated experience
-        // This handles cases where faculty had previous experience before joining this institution
         const calculatedFromJoining = Math.max(0, totalYears);
         calculatedExperience = Math.max(faculty.teachingExperience || 0, calculatedFromJoining);
       }
@@ -323,6 +375,8 @@ router.get("/department/:departmentName", async (req, res) => {
       return {
         ...faculty,
         name: faculty.name || `${faculty.firstName || ''} ${faculty.lastName || ''}`.trim(),
+        // Get department name from populated data or use the stored string value
+        department: faculty.department?.name || faculty.department || departmentName,
         // Include both original and calculated experience for frontend decision
         teachingExperience: calculatedExperience,
         originalExperience: faculty.teachingExperience || 0,
@@ -347,8 +401,9 @@ router.get("/department/:departmentName", async (req, res) => {
       success: true,
       message: "Faculties retrieved successfully",
       data: formattedFaculties,
-      department: correctedDeptName,
-      warning: populationError ? `Population error: ${populationError}` : undefined,
+      department: departmentName,
+      count: formattedFaculties.length,
+      searchApproaches: searchApproaches
     });
   } catch (error) {
     console.error("[FacultiesByDepartment] Error:", error);
@@ -406,6 +461,67 @@ router.get("/subject/:subjectId", async (req, res) => {
       message: "Error fetching faculties by subject",
       error: error.message,
     });
+  }
+});
+
+// Debug route to check actual department names in database
+router.get("/debug/check-department-names", async (req, res) => {
+  try {
+    const AcademicDepartment = await import("../models/AcademicDepartment.js").then(m => m.default);
+    
+    // Get all academic departments
+    const academicDepartments = await AcademicDepartment.find({}).select('name').lean();
+    
+    // Get all faculty departments with their counts - handle both ObjectId and string values
+    const facultyDepartments = await Faculty.aggregate([
+      {
+        $project: {
+          department: 1,
+          departmentType: { $type: "$department" },
+          departmentString: {
+            $cond: {
+              if: { $eq: [{ $type: "$department" }, "string"] },
+              then: "$department",
+              else: null
+            }
+          }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            department: "$department",
+            type: "$departmentType",
+            stringValue: "$departmentString"
+          },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    // Get simple faculty sample without population first
+    const facultiesSample = await Faculty.find({})
+      .select('firstName lastName department')
+      .limit(10)
+      .lean();
+    
+    console.log("Academic Departments:", academicDepartments);
+    console.log("Faculty Department Groups:", facultyDepartments);
+    console.log("Sample Faculty with Departments:", facultiesSample);
+    
+    res.json({
+      success: true,
+      data: {
+        academicDepartments: academicDepartments,
+        facultyDepartmentGroups: facultyDepartments,
+        sampleFacultiesWithDepartments: facultiesSample,
+        totalAcademicDepartments: academicDepartments.length,
+        totalFacultyDepartmentGroups: facultyDepartments.length
+      }
+    });
+  } catch (error) {
+    console.error("Debug check department names error:", error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
