@@ -248,6 +248,28 @@ router.post("/", upload.single("photo"), async (req, res) => {
   }
 });
 
+// Debug route to list all student identifiers
+router.get("/debug/list-identifiers", async (req, res) => {
+  try {
+    const students = await Student.find({}, 'enrollmentNumber studentId firstName lastName')
+      .limit(10);
+    
+    const identifiers = students.map(student => ({
+      _id: student._id,
+      enrollmentNumber: student.enrollmentNumber,
+      studentId: student.studentId,
+      name: `${student.firstName} ${student.lastName}`
+    }));
+    
+    res.json({
+      count: students.length,
+      identifiers: identifiers
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // DEBUG route - raw student data without populate
 router.get("/debug/:id", async (req, res) => {
   try {
@@ -259,7 +281,66 @@ router.get("/debug/:id", async (req, res) => {
   }
 });
 
-// READ Single Student
+// Search student by enrollment number or student ID
+router.get("/enrollment/:enrollmentNumber", async (req, res) => {
+  try {
+    const { enrollmentNumber } = req.params;
+    const searchTerm = decodeURIComponent(enrollmentNumber).trim();
+    
+    console.log("Searching for student with identifier:", searchTerm);
+    
+    // Try multiple search criteria
+    const searchQueries = [
+      { enrollmentNumber: searchTerm },
+      { studentId: searchTerm },
+      { enrollmentNumber: new RegExp(searchTerm, 'i') },
+      { studentId: new RegExp(searchTerm, 'i') }
+    ];
+    
+    let student = null;
+    
+    // Try each search query until we find a match
+    for (const query of searchQueries) {
+      student = await Student.findOne(query)
+        .populate("stream")
+        .populate("department") 
+        .populate("semester")
+        .populate("semesterRecords.semester")
+        .populate("semesterRecords.subjects.subject")
+        .populate("backlogs.subject")
+        .populate("backlogs.semester");
+      
+      if (student) {
+        console.log("Found student with query:", query);
+        break;
+      }
+    }
+
+    if (!student) {
+      console.log("Student not found with any search criteria");
+      return res.status(404).json({ 
+        error: "Student not found",
+        searchTerm: searchTerm,
+        message: `No student found with enrollment number or student ID: ${searchTerm}`
+      });
+    }
+
+    // Apply minimal filtering - keep data even if some fields are missing
+    const cleanedStudent = {
+      ...student._doc,
+      semesterRecords: student.semesterRecords || [],
+      backlogs: student.backlogs || [],
+    };
+
+    console.log("Returning student data for:", cleanedStudent.enrollmentNumber || cleanedStudent.studentId);
+    res.json(cleanedStudent);
+  } catch (err) {
+    console.error("Error fetching student by enrollment number:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// READ Single Student (by MongoDB ObjectId)
 router.get("/:id", async (req, res) => {
   try {
     const student = await Student.findById(req.params.id)

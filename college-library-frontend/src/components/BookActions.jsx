@@ -250,7 +250,7 @@ const BookActions = () => {
           const studentId = id.trim()
 
           try {
-            const response = await axios.get(`hhttp://localhost:5000/api/students/${studentId}`)
+            const response = await axios.get(`http://localhost:5000/api/students/enrollment/${encodeURIComponent(studentId)}`)
             console.log("Student data response:", response.data)
 
             if (response.data) {
@@ -1032,7 +1032,7 @@ const BookActions = () => {
         let specificError = "No transaction history found"
         if (filters.studentId && filters.borrowerType === "student") {
           try {
-            await axios.get(`http://localhost:5000/api/students/${filters.studentId}`)
+            await axios.get(`http://localhost:5000/api/students/enrollment/${encodeURIComponent(filters.studentId)}`)
           } catch (err) {
             if (err.response?.status === 404) {
               specificError = `Student with ID ${filters.studentId} not found.`
@@ -1111,7 +1111,7 @@ const BookActions = () => {
 
         const studentId = value.trim()
 
-        const response = await axios.get(`http://localhost:5000/api/students/${studentId}`)
+        const response = await axios.get(`http://localhost:5000/api/students/enrollment/${encodeURIComponent(studentId)}`)
         console.log("Student data response:", response.data)
 
         if (response.data) {
