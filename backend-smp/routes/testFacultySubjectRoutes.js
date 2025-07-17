@@ -33,9 +33,9 @@ router.get("/test-department-faculty-subjects/:department", async (req, res) => 
     }).select('name code').populate('department', 'name');
     console.log(`[TEST API] Found ${subjects.length} subjects:`, subjects.map(s => s.name));
     
-    // Get all faculties for the department with their subjects (using string department)
+    // Get all faculties for the department using the ObjectId
     const faculties = await Faculty.find({
-      department: department, // Faculty uses string department
+      department: academicDepartment._id, // Use ObjectId for department
       status: "Active"
     }).populate({
       path: 'subjectsTaught',

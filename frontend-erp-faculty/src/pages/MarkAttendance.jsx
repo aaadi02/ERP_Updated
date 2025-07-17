@@ -66,6 +66,8 @@ export default function MarkAttendance() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [attendanceStats, setAttendanceStats] = useState({});
   const [studentNotes, setStudentNotes] = useState({});
+  const [subjectDetails, setSubjectDetails] = useState(null);
+  const [loadingSubjectDetails, setLoadingSubjectDetails] = useState(false);
 
   // Filter states
   const [queryType, setQueryType] = useState("day");
@@ -95,11 +97,36 @@ export default function MarkAttendance() {
   // Load students and stats when subject is expanded
   useEffect(() => {
     if (expandedSubject) {
+      fetchSubjectDetails(expandedSubject);
       fetchStudents(expandedSubject);
       checkTodayAttendance(expandedSubject);
       calculateMonthlyClassAttendance(expandedSubject);
     }
   }, [expandedSubject]);
+
+  // Function to fetch subject details automatically
+  const fetchSubjectDetails = async (subjectId) => {
+    try {
+      setLoadingSubjectDetails(true);
+      const token = localStorage.getItem("authToken");
+      
+      const response = await api.get(`/faculty/markattendance/subject-details/${subjectId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.data.success) {
+        setSubjectDetails(response.data.data);
+      } else {
+        console.error("Failed to load subject details:", response.data.message);
+        setSubjectDetails(null);
+      }
+    } catch (err) {
+      console.error("Error fetching subject details:", err);
+      setSubjectDetails(null);
+    } finally {
+      setLoadingSubjectDetails(false);
+    }
+  };
 
   // Function to check if attendance is already marked for today
   const checkTodayAttendance = async (subjectId) => {
@@ -373,7 +400,9 @@ export default function MarkAttendance() {
     try {
       setLoading(true);
       const token = localStorage.getItem("authToken");
-      const response = await api.get(`/faculty/students/subject/${subjectId}`, {
+      
+      // Use the new enhanced endpoint that filters students by subject criteria
+      const response = await api.get(`/faculty/markattendance/students/${subjectId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -384,7 +413,7 @@ export default function MarkAttendance() {
         // Fetch attendance stats for each student
         fetchAttendanceStats(studentsData, subjectId);
       } else {
-        setError("Failed to load students");
+        setError("Failed to load students for this subject");
       }
     } catch (err) {
       console.error("Error fetching students:", err);
@@ -751,10 +780,29 @@ export default function MarkAttendance() {
         {expandedSubject && (
           <div className="bg-white rounded-2xl shadow-xl border border-blue-100 p-6 mb-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
-              <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                <Users className="h-6 w-6 text-green-600" />
-                Students & Attendance
-              </h2>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                  <Users className="h-6 w-6 text-green-600" />
+                  Students & Attendance
+                </h2>
+                
+                {/* Subject Details */}
+                {loadingSubjectDetails ? (
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                    <span className="text-sm text-gray-600">Loading subject details...</span>
+                  </div>
+                ) : subjectDetails ? (
+                  <div className="mt-2 text-sm text-gray-600">
+                    <span className="font-medium">Department:</span> {subjectDetails.department} | 
+                    <span className="font-medium"> Year:</span> {subjectDetails.year} | 
+                    <span className="font-medium"> Section:</span> {subjectDetails.section}
+                    {subjectDetails.totalStudents > 0 && (
+                      <> | <span className="font-medium">Total Students:</span> {subjectDetails.totalStudents}</>
+                    )}
+                  </div>
+                ) : null}
+              </div>
               
               {/* Today's Attendance Status */}
               {checkingTodayAttendance ? (
@@ -1002,11 +1050,24 @@ export default function MarkAttendance() {
               </table>
             </div>
             
-            {students.length === 0 && (
+            {students.length === 0 && !loading && (
               <div className="p-8 text-center">
                 <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-600 mb-2">No Students Found</h3>
-                <p className="text-gray-500">No students are enrolled in this subject.</p>
+                {subjectDetails ? (
+                  <p className="text-gray-500">
+                    No students found for {subjectDetails.department} - Year {subjectDetails.year}, Section {subjectDetails.section}
+                  </p>
+                ) : (
+                  <p className="text-gray-500">No students are enrolled in this subject.</p>
+                )}
+              </div>
+            )}
+            
+            {loading && (
+              <div className="p-8 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading students...</p>
               </div>
             )}
           </div>
