@@ -16,6 +16,7 @@ const BorrowerEntry = () => {
     gender: "",
     branchFaculty: "",
     designation: "",
+    btStatus: "",
     btValidDate: "",
     librarian: "",
     admissionBatchSem: "",
@@ -39,16 +40,67 @@ const BorrowerEntry = () => {
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
 
+  // Helper function to determine if a field is required based on borrower type
+  const isFieldRequired = (fieldName) => {
+    if (!formData.borrowerType) return false;
+    
+    const baseRequiredFields = [
+      "borrowerType",
+      "employeeId", 
+      "firstName",
+      "lastName",
+      "gender",
+      "librarian",
+      "academicYear",
+      "duration",
+      "noOfRenewal",
+      "issueBBBook",
+      "borrowDate",
+      "dueDate",
+    ];
+
+    if (baseRequiredFields.includes(fieldName)) return true;
+
+    if (formData.borrowerType === "Student") {
+      // For students: all conditional fields are optional (admissionBatchSem, designation, btStatus, btValidDate)
+      return false;
+    } else if (formData.borrowerType === "Employee") {
+      // For employees: designation is required, admissionBatchSem, btStatus, and btValidDate are optional
+      return fieldName === "designation";
+    } else {
+      // For "Other" type, all fields are required including btStatus and btValidDate
+      return ["branchFaculty", "designation", "admissionBatchSem", "btStatus", "btValidDate"].includes(fieldName);
+    }
+  };
+
+  // Helper function to get field label with required indicator
+  const getFieldLabel = (fieldName, displayName) => {
+    const required = isFieldRequired(fieldName);
+    return required ? `${displayName} *` : `${displayName} (Optional)`;
+  };
+
 
   // Fetch all faculties
   const fetchAllFaculties = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/faculty/all")
+      const response = await fetch("http://localhost:5000/api/faculty/faculties")
       if (!response.ok) throw new Error(`Failed to fetch faculties: ${response.status}`)
       const data = await response.json()
-      const facultiesArray = Array.isArray(data.faculties) ? data.faculties : []
+      // Handle the specific response structure: {"success": true, "data": {"faculties": [...]}}
+      let facultiesArray = []
+      if (data.success && data.data && Array.isArray(data.data.faculties)) {
+        facultiesArray = data.data.faculties
+      } else if (Array.isArray(data)) {
+        facultiesArray = data
+      } else if (data.faculties && Array.isArray(data.faculties)) {
+        facultiesArray = data.faculties
+      } else if (data.data && Array.isArray(data.data)) {
+        facultiesArray = data.data
+      }
       setAllFaculties(facultiesArray)
+      console.log('Faculties loaded:', facultiesArray.length)
     } catch (err) {
+      console.error('Faculty fetch error:', err)
       setError(`Failed to fetch faculties: ${err.message}`)
     }
   }
@@ -56,14 +108,28 @@ const BorrowerEntry = () => {
   // Fetch all students
   const fetchAllStudents = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/students", {
+      // Try the main students endpoint first
+      let response = await fetch("http://localhost:5000/api/students", {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
       })
+      
+      // If that fails, try the /all endpoint
+      if (!response.ok) {
+        response = await fetch("http://localhost:5000/api/students/all", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+        })
+      }
+      
       if (!response.ok) throw new Error(`Failed to fetch students: ${response.status}`)
+      
       const data = await response.json()
       let studentsArray = []
       if (data.students && Array.isArray(data.students)) {
@@ -74,7 +140,9 @@ const BorrowerEntry = () => {
         studentsArray = data
       }
       setAllStudents(studentsArray)
+      console.log('Students loaded:', studentsArray.length)
     } catch (err) {
+      console.error('Students fetch error:', err)
       setError(`Failed to fetch students: ${err.message}`)
     }
   }
@@ -365,7 +433,37 @@ const BorrowerEntry = () => {
       }));
     }
 
+    // Auto-calculate dates when Book Bank fields change
+    if (name === 'bookBankValidDate' && value) {
+      // When Book Bank Valid Date is set, automatically set Borrow Date to the same date
+      setFormData((prev) => ({
+        ...prev,
+        borrowDate: value,
+        // Also recalculate due date if duration is already set
+        dueDate: prev.bookBankDuration ? calculateDueDate(value, prev.bookBankDuration) : prev.dueDate
+      }));
+    }
 
+    if (name === 'bookBankDuration' && value) {
+      // When Book Bank Duration is set, calculate Due Date based on Borrow Date (or Book Bank Valid Date)
+      const borrowDate = formData.borrowDate || formData.bookBankValidDate;
+      if (borrowDate) {
+        const calculatedDueDate = calculateDueDate(borrowDate, value);
+        setFormData((prev) => ({
+          ...prev,
+          dueDate: calculatedDueDate
+        }));
+      }
+    }
+
+    // If Borrow Date is manually changed and duration exists, recalculate due date
+    if (name === 'borrowDate' && value && formData.bookBankDuration) {
+      const calculatedDueDate = calculateDueDate(value, formData.bookBankDuration);
+      setFormData((prev) => ({
+        ...prev,
+        dueDate: calculatedDueDate
+      }));
+    }
 
     // Jab ID field change ho, auto-fill details
     if (name === "employeeId") {
@@ -399,35 +497,64 @@ const BorrowerEntry = () => {
     }
   }
 
+  // Helper function to calculate due date
+  const calculateDueDate = (startDate, durationInDays) => {
+    if (!startDate || !durationInDays) return '';
+    
+    const start = new Date(startDate);
+    const duration = parseInt(durationInDays);
+    
+    if (isNaN(duration)) return '';
+    
+    const dueDate = new Date(start);
+    dueDate.setDate(dueDate.getDate() + duration);
+    
+    // Format as YYYY-MM-DD for HTML date input
+    return dueDate.toISOString().split('T')[0];
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError(null)
     setSuccess(null)
 
-    // Validation
-    const requiredFields = [
+    // Validation - conditional required fields based on borrower type
+    let requiredFields = [
       "borrowerType",
       "employeeId",
       "firstName",
       "lastName",
       "gender",
-      "branchFaculty",
-      "btStatus",
-      "btValidDate",
       "librarian",
-      "admissionBatchSem",
       "academicYear",
       "duration",
       "noOfRenewal",
       "issueBBBook",
       "borrowDate",
       "dueDate",
-    ]
+    ];
+
+    // Add conditional required fields based on borrower type
+    if (formData.borrowerType === "Student") {
+      // For students: all conditional fields are optional (admissionBatchSem, designation, btStatus, btValidDate)
+      // No additional required fields
+    } else if (formData.borrowerType === "Employee") {
+      // For employees: designation is required, admissionBatchSem, btStatus, and btValidDate are optional
+      requiredFields.push("designation");
+    } else {
+      // For other types: include all fields including btStatus and btValidDate
+      requiredFields.push("branchFaculty");
+      requiredFields.push("designation");
+      requiredFields.push("admissionBatchSem");
+      requiredFields.push("btStatus");
+      requiredFields.push("btValidDate");
+    }
 
     const allFilled = requiredFields.every((key) => formData[key]?.trim() !== "");
 
     if (!allFilled) {
-      setError("All required fields must be filled.");
+      const missingFields = requiredFields.filter((key) => !formData[key]?.trim());
+      setError(`Please fill all required fields: ${missingFields.join(", ")}`);
       return;
     }
 
@@ -765,7 +892,7 @@ const BorrowerEntry = () => {
 
           <div className="w-full md:w-1/3 px-2 mb-4">
             <label htmlFor="branchFaculty" className="block text-sm font-medium text-gray-700 mb-1">
-              Branch/Faculty
+              {getFieldLabel("branchFaculty", "Branch/Faculty")}
             </label>
             <div className="relative">
               <User size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -783,7 +910,7 @@ const BorrowerEntry = () => {
 
           <div className="w-full md:w-1/3 px-2 mb-4">
             <label htmlFor="designation" className="block text-sm font-medium text-gray-700 mb-1">
-              Designation
+              {getFieldLabel("designation", "Designation")}
             </label>
             <div className="relative">
               <User size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -800,8 +927,29 @@ const BorrowerEntry = () => {
           </div>
 
           <div className="w-full md:w-1/3 px-2 mb-4">
+            <label htmlFor="btStatus" className="block text-sm font-medium text-gray-700 mb-1">
+              {getFieldLabel("btStatus", "BT Status")}
+            </label>
+            <div className="relative">
+              <User size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <select
+                id="btStatus"
+                name="btStatus"
+                value={formData.btStatus}
+                onChange={handleChange}
+                className="pl-10 w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none"
+              >
+                <option value="">Select Status</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+                <option value="Suspended">Suspended</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="w-full md:w-1/3 px-2 mb-4">
             <label htmlFor="btValidDate" className="block text-sm font-medium text-gray-700 mb-1">
-              BT Valid Date
+              {getFieldLabel("btValidDate", "BT Valid Date")}
             </label>
             <div className="relative">
               <Calendar size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -836,7 +984,7 @@ const BorrowerEntry = () => {
 
           <div className="w-full md:w-1/3 px-2 mb-4">
             <label htmlFor="admissionBatchSem" className="block text-sm font-medium text-gray-700 mb-1">
-              Admission Batch/Sem
+              {getFieldLabel("admissionBatchSem", "Admission Batch/Sem")}
             </label>
             <div className="relative">
               <User size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />

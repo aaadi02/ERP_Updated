@@ -1,8 +1,38 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const Library = () => {
-  const studentId = 'CSEBTECH002'; // Hardcoded for now
+  const navigate = useNavigate();
+  
+  // Get student ID from localStorage, URL params, or redirect to login
+  const getStudentId = () => {
+    // First priority: Get from logged-in student data (from StudentLogin)
+    const loggedInStudent = localStorage.getItem('studentData');
+    if (loggedInStudent) {
+      const student = JSON.parse(loggedInStudent);
+      return student.studentId || student._id || student.id;
+    }
+
+    // Second priority: Get from current student (set by StudentList)
+    const storedStudent = localStorage.getItem('currentStudent');
+    if (storedStudent) {
+      const student = JSON.parse(storedStudent);
+      return student.studentId || student._id;
+    }
+    
+    // Third priority: Get from URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    const studentIdFromUrl = urlParams.get('studentId');
+    if (studentIdFromUrl) {
+      return studentIdFromUrl;
+    }
+    
+    // If no student data found, return null to indicate user needs to login
+    return null;
+  };
+
+  const studentId = getStudentId();
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
   const [books, setBooks] = useState([]);
@@ -10,24 +40,127 @@ const Library = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
 
+  // Check if student is logged in, redirect to login if not
   useEffect(() => {
-    axios.get(`${API_URL}/api/library/${studentId}`)
-      .then(res => {
-        setBooks(res.data);
-        setLoading(false);
-        console.log("Student ID:", studentId);
-      })
-      .catch(err => {
-        console.error('Error fetching issued books:', err);
-        setLoading(false);
+    if (!studentId) {
+      console.log('No student logged in, redirecting to login...');
+      navigate('/student-login');
+      return;
+    }
+  }, [studentId, navigate]);
+
+  // Get student information for display
+  const getStudentInfo = () => {
+    // First priority: Get from logged-in student data
+    const loggedInStudent = localStorage.getItem('studentData');
+    if (loggedInStudent) {
+      const student = JSON.parse(loggedInStudent);
+      return {
+        name: student.name || (student.firstName + ' ' + (student.lastName || '')).trim() || 'Student',
+        department: student.department?.name || student.department || student.branch || 'Unknown Department',
+        semester: student.semester?.number || student.semester || student.currentSemester || 'N/A',
+        email: student.email || '',
+        phone: student.phone || student.mobileNumber || ''
+      };
+    }
+
+    // Second priority: Get from current student (set by StudentList)
+    const storedStudent = localStorage.getItem('currentStudent');
+    if (storedStudent) {
+      const student = JSON.parse(storedStudent);
+      return {
+        name: student.name || 'Student',
+        department: student.department || 'Unknown Department',
+        semester: student.semester || 'N/A',
+        email: student.email || '',
+        phone: student.phone || ''
+      };
+    }
+
+    return {
+      name: 'Student',
+      department: 'Unknown Department',
+      semester: 'N/A',
+      email: '',
+      phone: ''
+    };
+  };
+
+  // Function to fetch borrowed books for the current student
+  const fetchBorrowedBooks = async () => {
+    try {
+      setLoading(true);
+      console.log(`🔍 Fetching borrowed books for student ID: ${studentId}`);
+      
+      const response = await axios.get(`${API_URL}/api/issues/borrowed-books`, {
+        params: {
+          borrowerId: studentId,
+          borrowerType: 'student',
+          includeRenewed: true,
+          status: 'all'
+        }
       });
-  }, []);
+
+      let fetchedBooks = [];
+      if (response.data.success && response.data.data) {
+        fetchedBooks = response.data.data;
+        console.log(`📖 Found ${fetchedBooks.length} books for student ${studentId}`);
+      }
+
+      // Format the books to match the expected structure
+      const formattedBooks = fetchedBooks.map(book => ({
+        bookId: book.bookId || book._id,
+        bookTitle: book.title || book.bookTitle || 'Unknown Title',
+        issueDate: book.issueDate || book.createdAt,
+        dueDate: book.dueDate,
+        renewalCount: book.renewalCount || 0,
+        status: book.status || 'active'
+      }));
+
+      setBooks(formattedBooks);
+      console.log("Student ID:", studentId);
+      console.log("Formatted books:", formattedBooks);
+    } catch (err) {
+      console.error('Error fetching issued books:', err);
+      // If the API call fails, try alternative approach
+      if (err.response?.status === 404) {
+        console.log(`No books currently issued to student ${studentId}`);
+        setBooks([]);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (studentId) {
+      fetchBorrowedBooks();
+    }
+  }, [studentId]);
 
   const getDaysLeft = (dueDate) => {
     const today = new Date();
     const due = new Date(dueDate);
     const diff = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
     return diff;
+  };
+
+  // Calculate book statistics similar to StudentList.jsx
+  const getBookStats = () => {
+    const totalBooks = books.length;
+    const dueSoonBooks = books.filter(b => {
+      const daysLeft = getDaysLeft(b.dueDate);
+      return daysLeft >= 0 && daysLeft <= 3;
+    }).length;
+    const overdueBooks = books.filter(b => getDaysLeft(b.dueDate) < 0).length;
+    const activeBooks = books.filter(b => getDaysLeft(b.dueDate) > 3).length;
+
+    return {
+      total: totalBooks,
+      dueSoon: dueSoonBooks,
+      overdue: overdueBooks,
+      active: activeBooks
+    };
   };
 
   const getStatusColor = (daysLeft) => {
