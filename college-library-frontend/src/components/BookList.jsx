@@ -7,12 +7,23 @@ import { saveAs } from 'file-saver';
 import { AuthContext } from '../context/AuthContext';
 import html2canvas from 'html2canvas'; // Static import
 
-// Note: Currently using mock data since backend book endpoints are not implemented
-// TODO: Replace with real API calls when backend is ready
+// Now connected to real MongoDB data with fallback to mock data
+// Fetches real book data from MongoDB Atlas cluster
 const API_URL = 'http://localhost:5000/api/books';
 
 const BookList = () => {
   const { isAuthenticated } = useContext(AuthContext);
+  
+  // Material types matching AddBook.jsx
+  const materialTypes = [
+    { id: 'book', name: 'Books' },
+    { id: 'magazine', name: 'Magazine' },
+    { id: 'journal', name: 'Journal' },
+    { id: 'thesis', name: 'Thesis' },
+    { id: 'report', name: 'Report' },
+    { id: 'research', name: 'Research Paper' },
+    { id: 'newspaper', name: 'Newspaper' }
+  ];
   const [books, setBooks] = useState([]);
   const [error, setError] = useState(null);
   const [searchBy, setSearchBy] = useState('Title');
@@ -30,6 +41,7 @@ const BookList = () => {
   const [modalType, setModalType] = useState('');
   const [modalMessage, setModalMessage] = useState('');
   const [formErrors, setFormErrors] = useState({});
+  const [showEbookModal, setShowEbookModal] = useState(false);
 
   // Fetch books when component mounts or filters change
   useEffect(() => {
@@ -42,131 +54,208 @@ const BookList = () => {
 
   const fetchBooks = async () => {
     try {
-      // Generate mock data based on the active tab and filters
-      const generateMockBooks = (type, count) => {
-        const titles = {
-          book: [
-            'Introduction to Computer Science', 'Data Structures and Algorithms', 'Database Management Systems',
-            'Operating Systems Concepts', 'Software Engineering', 'Computer Networks', 'Artificial Intelligence',
-            'Machine Learning Fundamentals', 'Web Development', 'Mobile App Development', 'Cybersecurity Basics',
-            'Digital Image Processing', 'Computer Graphics', 'Human Computer Interaction', 'Software Testing',
-            'Project Management', 'Systems Analysis and Design', 'Programming Languages', 'Compiler Design',
-            'Theory of Computation', 'Advanced Mathematics', 'Engineering Physics', 'Engineering Chemistry',
-            'Engineering Mechanics', 'Electrical Engineering', 'Mechanical Engineering', 'Civil Engineering',
-            'Electronics and Communication', 'Information Technology', 'Business Management'
-          ],
-          journal: [
-            'IEEE Computer Society', 'ACM Computing Surveys', 'Journal of Systems and Software',
-            'Information and Software Technology', 'Computer Networks Journal', 'AI Research Journal',
-            'Machine Learning Review', 'Software Engineering Journal', 'Database Systems Journal',
-            'Computer Graphics and Applications', 'Cybersecurity Today', 'IT Management Quarterly',
-            'Engineering Research Journal', 'Science and Technology Review', 'Academic Computing'
-          ],
-          ebooksource: [
-            'Digital Library Collection', 'Online Programming Tutorials', 'E-Learning Resources',
-            'Digital Reference Materials', 'Online Course Materials', 'Digital Archives',
-            'Electronic Dissertations', 'Online Research Papers', 'Digital Textbooks',
-            'Virtual Laboratory Manuals', 'Online Technical Documentation'
-          ]
-        };
-
-        const authors = [
-          'Dr. John Smith', 'Prof. Mary Johnson', 'Dr. Robert Brown', 'Prof. Sarah Davis',
-          'Dr. Michael Wilson', 'Prof. Emily Garcia', 'Dr. David Martinez', 'Prof. Lisa Anderson',
-          'Dr. James Taylor', 'Prof. Jennifer Thomas', 'Dr. Christopher Lee', 'Prof. Amanda White',
-          'Dr. William Harris', 'Prof. Jessica Clark', 'Dr. Richard Lewis', 'Prof. Ashley Walker'
-        ];
-
-        const publishers = [
-          'Pearson Education', 'McGraw-Hill', 'Cengage Learning', 'Wiley Publications',
-          'Oxford University Press', 'Cambridge University Press', 'Springer', 'Elsevier',
-          'Prentice Hall', 'Thomson Reuters', 'Academic Press', 'MIT Press'
-        ];
-
-        const cities = ['New York', 'London', 'Boston', 'Chicago', 'Delhi', 'Mumbai', 'Pune', 'Bangalore'];
-        
-        const seriesCodes = {
-          book: ['BB', 'GR', 'LR', 'MBA'],
-          journal: ['JOURNAL'],
-          ebooksource: ['EB', 'DIGITAL']
-        };
-
-        const subjects = [
-          'Computer Science', 'Information Technology', 'Software Engineering', 'Data Science',
-          'Artificial Intelligence', 'Machine Learning', 'Web Development', 'Mobile Computing',
-          'Network Security', 'Database Systems', 'Operating Systems', 'Computer Networks',
-          'Mathematics', 'Physics', 'Chemistry', 'Mechanical Engineering', 'Electrical Engineering',
-          'Civil Engineering', 'Electronics', 'Management', 'Business Studies'
-        ];
-
-        return Array.from({ length: count }, (_, i) => {
-          const titleList = titles[type] || titles.book;
-          const seriesCodeList = seriesCodes[type] || seriesCodes.book;
-          
-          return {
-            _id: `${type}_${i + 1}`,
-            bookId: `${type}_${i + 1}`,
-            ACCNO: `${seriesCodeList[i % seriesCodeList.length]}/${(1000 + i).toString()}`,
-            TITLENAME: titleList[i % titleList.length],
-            AUTHOR: authors[i % authors.length],
-            'PUBLISHER NAME': publishers[i % publishers.length],
-            CITY: cities[i % cities.length],
-            'PUB.YEAR': 2020 + (i % 5),
-            PAGES: 200 + (i % 300),
-            SERIESCODE: seriesCodeList[i % seriesCodeList.length],
-            CLASSNO: `${(500 + (i % 100)).toString()}.${(i % 10)}`,
-            'SUBJECT NAME': subjects[i % subjects.length],
-            STATUS: i % 10 === 0 ? 'ISSUE' : 'PRESENT',
-            PRINTPRICE: 500 + (i % 1000),
-            PURPRICE: 450 + (i % 900),
-            REFCIR: 'Yes',
-            ACCDATE: new Date(2023, i % 12, (i % 28) + 1).toISOString().split('T')[0],
-            INVOICENO: `INV${1000 + i}`,
-            INVOICE_DATE: new Date(2023, i % 12, (i % 28) + 1).toISOString().split('T')[0],
-            'VENDER CITY': cities[i % cities.length],
-            QUANTITY: i % 15 === 0 ? 0 : Math.floor(Math.random() * 10) + 1,
-            materialType: type
-          };
-        });
-      };
-
-      // Filter the mock data based on search criteria
-      let mockBooks = [];
-      const counts = { book: 150, journal: 45, ebooksource: 25 };
+      setError(null);
       
-      mockBooks = generateMockBooks(activeTab, counts[activeTab] || 150);
+      // First try to fetch real data from MongoDB
+      let apiUrl = `${API_URL}`;
+      if (activeTab && activeTab !== 'book') {
+        apiUrl += `?type=${activeTab}`;
+      }
+      
+      console.log('Fetching books from:', apiUrl);
+      const response = await fetch(apiUrl);
+      
+      if (response.ok) {
+        const data = await response.json();
+        let booksData = data.books || [];
+        
+        console.log(`Loaded ${booksData.length} real books from MongoDB`);
+        
+        // Apply search filters
+        if (searchTerm.trim()) {
+          const searchLower = searchTerm.toLowerCase();
+          booksData = booksData.filter(book => {
+            switch(searchBy) {
+              case 'Title':
+                return book.TITLENAME?.toLowerCase().includes(searchLower);
+              case 'Author':
+                return book.AUTHOR?.toLowerCase().includes(searchLower);
+              case 'AccessionNo':
+                return book.ACCNO?.toLowerCase().includes(searchLower);
+              default:
+                return book.TITLENAME?.toLowerCase().includes(searchLower);
+            }
+          });
+        }
 
-      // Apply search filters
-      if (searchTerm.trim()) {
-        const searchLower = searchTerm.toLowerCase();
-        mockBooks = mockBooks.filter(book => {
-          switch(searchBy) {
-            case 'Title':
-              return book.TITLENAME?.toLowerCase().includes(searchLower);
-            case 'Author':
-              return book.AUTHOR?.toLowerCase().includes(searchLower);
-            case 'AccessionNo':
-              return book.ACCNO?.toLowerCase().includes(searchLower);
-            case 'Subject':
-              return book['SUBJECT NAME']?.toLowerCase().includes(searchLower);
-            default:
-              return book.TITLENAME?.toLowerCase().includes(searchLower);
+        // Apply series filter
+        if (bookSeries) {
+          booksData = booksData.filter(book => book.SERIESCODE === bookSeries);
+        }
+
+        setBooks(booksData);
+        setFilteredBooks(booksData);
+        
+        // Show appropriate message when no data is found
+        if (booksData.length === 0 && !searchTerm && !bookSeries) {
+          // For these material types, show modal instead of mock data
+          if (['ebooksource', 'thesis', 'report', 'research', 'newspaper'].includes(activeTab)) {
+            console.log(`No ${activeTab} found in database - showing modal message`);
+            setShowEbookModal(true);
+            return;
+          } else {
+            console.log('No books found in database, falling back to mock data');
+            generateAndSetMockData();
           }
-        });
+        }
+        
+        return;
+      } else {
+        console.warn('API request failed, falling back to mock data:', response.status);
+        // For these material types, show modal instead of mock data
+        if (['ebooksource', 'thesis', 'report', 'research', 'newspaper'].includes(activeTab)) {
+          setShowEbookModal(true);
+          setBooks([]);
+          setFilteredBooks([]);
+          return;
+        }
+        generateAndSetMockData();
       }
-
-      // Apply series filter
-      if (bookSeries) {
-        mockBooks = mockBooks.filter(book => book.SERIESCODE === bookSeries);
-      }
-
-      setBooks(mockBooks);
-      setFilteredBooks(mockBooks);
-      console.log(`Loaded ${mockBooks.length} mock ${activeTab} items`);
       
     } catch (err) {
-      setError(`Failed to load books: ${err.message}. Using mock data for demonstration.`);
+      console.error('Error fetching books from API:', err);
+      // For these material types, show modal instead of mock data
+      if (['ebooksource', 'thesis', 'report', 'research', 'newspaper'].includes(activeTab)) {
+        setShowEbookModal(true);
+        setBooks([]);
+        setFilteredBooks([]);
+        return;
+      }
+      setError(`Connected to mock data. (API Error: ${err.message})`);
+      generateAndSetMockData();
     }
+  };
+
+  const generateAndSetMockData = () => {
+    // Generate mock data based on the active tab and filters
+    const generateMockBooks = (type, count) => {
+      const titles = {
+        book: [
+          'Introduction to Computer Science', 'Data Structures and Algorithms', 'Database Management Systems',
+          'Operating Systems Concepts', 'Software Engineering', 'Computer Networks', 'Artificial Intelligence',
+          'Machine Learning Fundamentals', 'Web Development', 'Mobile App Development', 'Cybersecurity Basics',
+          'Digital Image Processing', 'Computer Graphics', 'Human Computer Interaction', 'Software Testing',
+          'Project Management', 'Systems Analysis and Design', 'Programming Languages', 'Compiler Design',
+          'Theory of Computation', 'Advanced Mathematics', 'Engineering Physics', 'Engineering Chemistry',
+          'Engineering Mechanics', 'Electrical Engineering', 'Mechanical Engineering', 'Civil Engineering',
+          'Electronics and Communication', 'Information Technology', 'Business Management'
+        ],
+        journal: [
+          'IEEE Computer Society', 'ACM Computing Surveys', 'Journal of Systems and Software',
+          'Information and Software Technology', 'Computer Networks Journal', 'AI Research Journal',
+          'Machine Learning Review', 'Software Engineering Journal', 'Database Systems Journal',
+          'Computer Graphics and Applications', 'Cybersecurity Today', 'IT Management Quarterly',
+          'Engineering Research Journal', 'Science and Technology Review', 'Academic Computing'
+        ],
+        ebooksource: [
+          'Digital Library Collection', 'Online Programming Tutorials', 'E-Learning Resources',
+          'Digital Reference Materials', 'Online Course Materials', 'Digital Archives',
+          'Electronic Dissertations', 'Online Research Papers', 'Digital Textbooks',
+          'Virtual Laboratory Manuals', 'Online Technical Documentation'
+        ]
+      };
+
+      const authors = [
+        'Dr. John Smith', 'Prof. Mary Johnson', 'Dr. Robert Brown', 'Prof. Sarah Davis',
+        'Dr. Michael Wilson', 'Prof. Emily Garcia', 'Dr. David Martinez', 'Prof. Lisa Anderson',
+        'Dr. James Taylor', 'Prof. Jennifer Thomas', 'Dr. Christopher Lee', 'Prof. Amanda White',
+        'Dr. William Harris', 'Prof. Jessica Clark', 'Dr. Richard Lewis', 'Prof. Ashley Walker'
+      ];
+
+      const publishers = [
+        'Pearson Education', 'McGraw-Hill', 'Cengage Learning', 'Wiley Publications',
+        'Oxford University Press', 'Cambridge University Press', 'Springer', 'Elsevier',
+        'Prentice Hall', 'Thomson Reuters', 'Academic Press', 'MIT Press'
+      ];
+
+      const cities = ['New York', 'London', 'Boston', 'Chicago', 'Delhi', 'Mumbai', 'Pune', 'Bangalore'];
+      
+      const seriesCodes = {
+        book: ['BB', 'GR', 'LR', 'MBA'],
+        journal: ['JOURNAL'],
+        ebooksource: ['EB', 'DIGITAL']
+      };
+
+      const subjects = [
+        'Computer Science', 'Information Technology', 'Software Engineering', 'Data Science',
+        'Artificial Intelligence', 'Machine Learning', 'Web Development', 'Mobile Computing',
+        'Network Security', 'Database Systems', 'Operating Systems', 'Computer Networks',
+        'Mathematics', 'Physics', 'Chemistry', 'Mechanical Engineering', 'Electrical Engineering',
+        'Civil Engineering', 'Electronics', 'Management', 'Business Studies'
+      ];
+
+      return Array.from({ length: count }, (_, i) => {
+        const titleList = titles[type] || titles.book;
+        const seriesCodeList = seriesCodes[type] || seriesCodes.book;
+        
+        return {
+          _id: `${type}_${i + 1}`,
+          bookId: `${type}_${i + 1}`,
+          ACCNO: `${seriesCodeList[i % seriesCodeList.length]}/${(1000 + i).toString()}`,
+          TITLENAME: titleList[i % titleList.length],
+          AUTHOR: authors[i % authors.length],
+          'PUBLISHER NAME': publishers[i % publishers.length],
+          CITY: cities[i % cities.length],
+          'PUB.YEAR': 2020 + (i % 5),
+          PAGES: 200 + (i % 300),
+          SERIESCODE: seriesCodeList[i % seriesCodeList.length],
+          CLASSNO: `${(500 + (i % 100)).toString()}.${(i % 10)}`,
+          'SUBJECT NAME': subjects[i % subjects.length],
+          STATUS: i % 10 === 0 ? 'ISSUE' : 'PRESENT',
+          PRINTPRICE: 500 + (i % 1000),
+          PURPRICE: 450 + (i % 900),
+          REFCIR: 'Yes',
+          ACCDATE: new Date(2023, i % 12, (i % 28) + 1).toISOString().split('T')[0],
+          INVOICENO: `INV${1000 + i}`,
+          INVOICE_DATE: new Date(2023, i % 12, (i % 28) + 1).toISOString().split('T')[0],
+          'VENDER CITY': cities[i % cities.length],
+          QUANTITY: i % 15 === 0 ? 0 : Math.floor(Math.random() * 10) + 1,
+          materialType: type
+        };
+      });
+    };
+
+    // Filter the mock data based on search criteria
+    let mockBooks = [];
+    const counts = { book: 150, journal: 45, ebooksource: 25 };
+    
+    mockBooks = generateMockBooks(activeTab, counts[activeTab] || 150);
+
+    // Apply search filters
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      mockBooks = mockBooks.filter(book => {
+        switch(searchBy) {
+          case 'Title':
+            return book.TITLENAME?.toLowerCase().includes(searchLower);
+          case 'Author':
+            return book.AUTHOR?.toLowerCase().includes(searchLower);
+          case 'AccessionNo':
+            return book.ACCNO?.toLowerCase().includes(searchLower);
+          default:
+            return book.TITLENAME?.toLowerCase().includes(searchLower);
+        }
+      });
+    }
+
+    // Apply series filter
+    if (bookSeries) {
+      mockBooks = mockBooks.filter(book => book.SERIESCODE === bookSeries);
+    }
+
+    setBooks(mockBooks);
+    setFilteredBooks(mockBooks);
+    console.log(`Loaded ${mockBooks.length} mock ${activeTab} items`);
   };
 
   const filterBooksByTitle = (booksArray, searchValue) => {
@@ -279,10 +368,52 @@ const BookList = () => {
   const getMaterialTypeName = (type) => {
     const types = {
       book: 'Book',
+      magazine: 'Magazine',
       journal: 'Journal',
+      thesis: 'Thesis',
+      report: 'Report',
+      research: 'Research Paper',
+      newspaper: 'Newspaper',
       ebooksource: 'EBookSource'
     };
     return types[type] || type;
+  };
+
+  const getMaterialTypeColor = (type) => {
+    const colors = {
+      book: 'bg-blue-200 text-blue-800',
+      magazine: 'bg-purple-200 text-purple-800',
+      journal: 'bg-green-200 text-green-800',
+      thesis: 'bg-yellow-200 text-yellow-800',
+      report: 'bg-orange-200 text-orange-800',
+      research: 'bg-red-200 text-red-800',
+      newspaper: 'bg-teal-200 text-teal-800',
+      ebooksource: 'bg-indigo-200 text-indigo-800'
+    };
+    return colors[type] || 'bg-gray-200 text-gray-800';
+  };
+
+  const getEmptyStateMessage = () => {
+    // Material types that show "not available" message instead of "no items found"
+    const unavailableTypes = ['ebooksource', 'thesis', 'report', 'research', 'newspaper'];
+    
+    if (unavailableTypes.includes(activeTab)) {
+      const materialType = materialTypes.find(type => type.id === activeTab);
+      const typeName = materialType ? materialType.name : activeTab;
+      
+      return {
+        title: `${typeName} Not Available`,
+        description: `${typeName} are not present in the library database. Once ${typeName.toLowerCase()} are added to the system, they will be shown here.`
+      };
+    }
+    
+    const materialType = materialTypes.find(type => type.id === activeTab);
+    const typeName = materialType ? materialType.name : 'Items';
+    
+    return {
+      title: `No ${typeName} Found`,
+      description: `No ${typeName.toLowerCase()} available in the library.`
+    };
   };
 
   const downloadBooksReport = () => {
@@ -504,24 +635,30 @@ const BookList = () => {
   const handleSearchTermChange = (e) => {
     const value = e.target.value;
     setSearchTerm(value);
-    // Reset search type to Title when user starts typing
-    setSearchBy('Title');
+    // Keep the selected search type - don't reset to Title
   };
 
-  const ErrorDisplay = ({ message }) => (
-    <div className="fixed top-6 right-6 bg-red-500 text-white p-4 rounded-xl shadow-2xl flex items-center max-w-md w-full z-50 animate-in fade-in duration-300 ease-in-out">
-      <AlertCircle size={24} className="text-white mr-3" />
-      <span className="text-sm font-medium">{message}</span>
-      <button
-        onClick={() => setError(null)}
-        className="ml-auto text-white hover:text-gray-200"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
-  );
+  const ErrorDisplay = ({ message }) => {
+    const isEbookMessage = message.includes('EBooks are not present');
+    const bgColor = isEbookMessage ? 'bg-blue-500' : 'bg-red-500';
+    const iconComponent = isEbookMessage ? Book : AlertCircle;
+    const IconComponent = iconComponent;
+    
+    return (
+      <div className={`fixed top-6 right-6 ${bgColor} text-white p-4 rounded-xl shadow-2xl flex items-center max-w-md w-full z-50 animate-in fade-in duration-300 ease-in-out`}>
+        <IconComponent size={24} className="text-white mr-3" />
+        <span className="text-sm font-medium">{message}</span>
+        <button
+          onClick={() => setError(null)}
+          className="ml-auto text-white hover:text-gray-200"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    );
+  };
 
   if (error) {
     return <ErrorDisplay message={error} />;
@@ -558,31 +695,23 @@ const BookList = () => {
           </div>
 
           <div className="md:w-3/4">
-            <div className="flex border-b border-gray-200 mb-6">
+            <div className="flex border-b border-gray-200 mb-6 overflow-x-auto">
+              {materialTypes.map((materialType) => (
+                <button
+                  key={materialType.id}
+                  className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === materialType.id ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-600'}`}
+                  onClick={() => {
+                    setActiveTab(materialType.id);
+                    setSearchTerm('');
+                    setSearchBy('Title');
+                    setBookSeries('');
+                  }}
+                >
+                  {materialType.name}
+                </button>
+              ))}
               <button
-                className={`px-4 py-2 font-medium ${activeTab === 'book' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-600'}`}
-                onClick={() => {
-                  setActiveTab('book');
-                  setSearchTerm('');
-                  setSearchBy('Title');
-                  setBookSeries('');
-                }}
-              >
-                Books
-              </button>
-              <button
-                className={`px-4 py-2 font-medium ${activeTab === 'journal' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-600'}`}
-                onClick={() => {
-                  setActiveTab('journal');
-                  setSearchTerm('');
-                  setSearchBy('Title');
-                  setBookSeries('');
-                }}
-              >
-                Journal
-              </button>
-              <button
-                className={`px-4 py-2 font-medium ${activeTab === 'ebooksource' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-600'}`}
+                className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === 'ebooksource' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-600'}`}
                 onClick={() => {
                   setActiveTab('ebooksource');
                   setSearchTerm('');
@@ -606,7 +735,6 @@ const BookList = () => {
                     <option value="Title">Title</option>
                     <option value="Author">Author</option>
                     <option value="AccessionNo">Accession No.</option>
-                    <option value="Subject">Subject</option>
                   </select>
                 </div>
                 <div className="w-full">
@@ -689,7 +817,6 @@ const BookList = () => {
                         </th>
                         <th className="px-6 py-4 text-left text-sm font-semibold">Publisher</th>
                         <th className="px-6 py-4 text-left text-sm font-semibold">Series Code</th>
-                        <th className="px-6 py-4 text-left text-sm font-semibold">Subject</th>
                         <th className="px-6 py-4 text-left text-sm font-semibold">Material Type</th>
                         <th className="px-6 py-4 text-left text-sm font-semibold">Quantity</th>
                         <th className="px-6 py-4 text-left text-sm font-semibold">Status</th>
@@ -712,13 +839,8 @@ const BookList = () => {
                             <div className="text-xs text-gray-500">{book.CITY}</div>
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-700">{book.SERIESCODE}</td>
-                          <td className="px-6 py-4 text-sm text-gray-700">{book['SUBJECT NAME']}</td>
                           <td className="px-6 py-4">
-                            <span className={`px-3 py-1 text-xs font-semibold rounded-full ${book.materialType === 'book' ? 'bg-blue-200 text-blue-800' :
-                              book.materialType === 'journal' ? 'bg-green-200 text-green-800' :
-                                book.materialType === 'ebooksource' ? 'bg-indigo-200 text-indigo-800' :
-                                  'bg-gray-200 text-gray-800'
-                              }`}>
+                            <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getMaterialTypeColor(book.materialType)}`}>
                               {getMaterialTypeName(book.materialType)}
                             </span>
                           </td>
@@ -771,12 +893,12 @@ const BookList = () => {
                 <div className="p-12 text-center">
                   <BookOpen size={96} className="text-gray-200 mx-auto mb-6" />
                   <h3 className="text-xl font-semibold text-gray-800 mb-3">
-                    No Items Found
+                    {searchTerm ? 'No Items Found' : getEmptyStateMessage().title}
                   </h3>
                   <p className="text-gray-500 text-sm max-w-md mx-auto">
                     {searchTerm
                       ? `No items match your search for "${searchTerm}".`
-                      : 'No books available in the library.'}
+                      : getEmptyStateMessage().description}
                   </p>
                   {searchTerm && (
                     <button
@@ -797,6 +919,75 @@ const BookList = () => {
             </div>
           </div>
         </div>
+
+        {/* Material Not Available Modal */}
+        {showEbookModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 animate-in fade-in duration-300 ease-out">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-8 shadow-2xl backdrop-blur-md bg-opacity-95 border-t-4 border-blue-500">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center">
+                  <Book size={32} className="text-blue-500 mr-3" />
+                  <h3 className="text-2xl font-bold text-blue-600">{getEmptyStateMessage().title}</h3>
+                </div>
+                <button
+                  onClick={() => setShowEbookModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="text-center mb-6">
+                <div className="bg-blue-50 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-4">
+                  <Book size={48} className="text-blue-400" />
+                </div>
+                <p className="text-gray-700 text-lg leading-relaxed">
+                  {getEmptyStateMessage().description}
+                </p>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  onClick={() => {
+                    setShowEbookModal(false);
+                    setActiveTab('book');
+                    setSearchTerm('');
+                    setSearchBy('Title');
+                    setBookSeries('');
+                  }}
+                  className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-all duration-300 flex items-center justify-center"
+                >
+                  <BookOpen size={20} className="mr-2" />
+                  View Books
+                </button>
+                <button
+                  onClick={() => {
+                    setShowEbookModal(false);
+                    setActiveTab('magazine');
+                    setSearchTerm('');
+                    setSearchBy('Title');
+                    setBookSeries('');
+                  }}
+                  className="px-6 py-3 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-all duration-300 flex items-center justify-center"
+                >
+                  <Book size={20} className="mr-2" />
+                  View Magazines
+                </button>
+              </div>
+              
+              <div className="mt-6 text-center">
+                <button
+                  onClick={() => setShowEbookModal(false)}
+                  className="text-gray-500 hover:text-gray-700 text-sm transition-colors"
+                >
+                  Close and stay on {materialTypes.find(type => type.id === activeTab)?.name || activeTab}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {showEditModal && isAuthenticated && (
           <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 animate-in fade-in duration-300 ease-out">

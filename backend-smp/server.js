@@ -52,6 +52,10 @@ import populatedDataRoutes from "./routes/populatedData.js";
 import feedbackRoutes from "./routes/feedback.js";
 import testFacultySubjectRoutes from "./routes/testFacultySubjectRoutes.js";
 import academicCalendarRoutes from "./routes/academicCalendar.js";
+import bookRoutes from "./routes/bookRoutes.js";
+import issueRoutes from "./routes/issueRoutes.js";
+import borrowerEntryRoutes from "./routes/borrowerEntryRoutes.js";
+import duesRoutes from "./routes/duesRoutes.js";
 
 // Setup __dirname in ES module
 const __filename = fileURLToPath(import.meta.url);
@@ -183,6 +187,10 @@ app.use("/api/populated", populatedDataRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/test", testFacultySubjectRoutes);
 app.use("/api/academic-calendar", academicCalendarRoutes);
+app.use("/api/books", bookRoutes);
+app.use("/api/issues", issueRoutes);
+app.use("/api", borrowerEntryRoutes);
+app.use("/api/dues", duesRoutes);
 
 // Connect to MongoDB
 mongoose

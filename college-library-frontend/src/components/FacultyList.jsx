@@ -34,6 +34,27 @@ const FacultyList = () => {
       }
 
       console.log('Sample faculty data:', facultyData[0]);
+      console.log('Total faculty members:', facultyData.length);
+      
+      // Debug department data
+      console.log('Sample faculty object keys:', Object.keys(facultyData[0]));
+      const departments = facultyData.map(f => f.department);
+      console.log('All departments:', departments);
+      console.log('Unique departments:', [...new Set(departments)]);
+      
+      // Check if department data might be in a different field
+      const possibleDeptFields = ['department', 'Department', 'dept', 'facultyDepartment', 'stream', 'branch', 'designation'];
+      possibleDeptFields.forEach(field => {
+        const values = facultyData.map(f => f[field]).filter(v => v !== undefined);
+        if (values.length > 0) {
+          console.log(`Found data in field '${field}':`, [...new Set(values)]);
+        }
+      });
+
+      // Check specific designation values to see if they contain department info
+      const designations = facultyData.map(f => f.designation).filter(d => d);
+      console.log('All designations:', designations);
+      console.log('Unique designations:', [...new Set(designations)]);
 
       const formattedFaculties = facultyData.map(faculty => {
         // Parse the joining date safely
@@ -61,7 +82,7 @@ const FacultyList = () => {
           middleName: faculty.middleName || '',
           lastName: faculty.lastName || '',
           name: [faculty.firstName, faculty.middleName, faculty.lastName].filter(Boolean).join(' ') || 'Unknown Faculty',
-          department: faculty.department || 'Unknown Department',
+          department: faculty.department?.name || faculty.department || 'Unknown Department',
           designation: faculty.designation || 'Not Specified',
           email: faculty.email || '',
           mobile: faculty.mobile || '',
@@ -73,11 +94,9 @@ const FacultyList = () => {
 
       setFaculties(formattedFaculties);
       
-      // Generate mock borrowed books for each faculty
-      console.log('📚 Generating mock borrowed books for faculty members (since /api/issues/borrowed-books endpoint does not exist)');
-      formattedFaculties.forEach(faculty => {
-        generateMockBorrowedBooks(faculty.employeeId);
-      });
+      // Fetch real borrowed books for each faculty from MongoDB
+      console.log('📚 Fetching real borrowed books for faculty members from database...');
+      await fetchBorrowedBooksForAllFaculty(formattedFaculties);
 
       setLoading(false);
     } catch (error) {
@@ -85,6 +104,124 @@ const FacultyList = () => {
       setError(error.message);
       setFaculties([]);
       setLoading(false);
+    }
+  };
+
+  // 📚 Function to fetch real borrowed books for all faculty from database
+  const fetchBorrowedBooksForAllFaculty = async (facultyList) => {
+    try {
+      const newBorrowedBooks = {};
+      
+      // Fetch borrowed books for each faculty member
+      for (const faculty of facultyList) {
+        try {
+          console.log(`🔍 Fetching books for faculty: ${faculty.employeeId}`);
+          
+          // First try the borrowed-books endpoint
+          let allBooks = [];
+          
+          try {
+            const borrowedResponse = await axios.get(`http://localhost:5000/api/issues/borrowed-books`, {
+              params: {
+                borrowerId: faculty.employeeId,
+                borrowerType: 'faculty'
+              }
+            });
+
+            if (borrowedResponse.data.success && borrowedResponse.data.data) {
+              const borrowedBooks = Array.isArray(borrowedResponse.data.data) ? borrowedResponse.data.data : [];
+              allBooks = [...borrowedBooks];
+              console.log(`📚 Found ${borrowedBooks.length} books from borrowed-books API for ${faculty.employeeId}`);
+            }
+          } catch (borrowedError) {
+            console.log(`ℹ️ borrowed-books API not available for ${faculty.employeeId}, using history only`);
+          }
+
+          // Also check history for additional/more recent transactions
+          try {
+            const historyResponse = await axios.get(`http://localhost:5000/api/issues/history`, {
+              params: {
+                employeeId: faculty.employeeId,
+                borrowerType: 'faculty',
+                page: 1,
+                limit: 50
+              }
+            });
+
+            if (historyResponse.data.success && historyResponse.data.data && historyResponse.data.data.records) {
+              const historyTransactions = historyResponse.data.data.records;
+              
+              // Group transactions by book to find the latest state
+              const bookMap = new Map();
+              
+              // Add existing books to map first
+              allBooks.forEach(book => {
+                const bookId = book.ACCNO || book.bookId;
+                bookMap.set(bookId, {
+                  ...book,
+                  source: 'borrowed-books'
+                });
+              });
+              
+              // Process history transactions
+              historyTransactions.forEach((transaction) => {
+                const bookId = transaction.bookId || transaction.ACCNO;
+                
+                // Keep track of the latest transaction for each book
+                if (!bookMap.has(bookId) || new Date(transaction.createdAt) > new Date(bookMap.get(bookId).createdAt || 0)) {
+                  bookMap.set(bookId, {
+                    ...transaction,
+                    source: 'history'
+                  });
+                }
+              });
+              
+              // Filter to only include books that are currently borrowed
+              const activeBorrowedBooks = [];
+              bookMap.forEach((latestTransaction, bookId) => {
+                if (latestTransaction.transactionType !== 'return' && latestTransaction.status === 'active') {
+                  activeBorrowedBooks.push({
+                    _id: latestTransaction._id,
+                    ACCNO: latestTransaction.bookId || latestTransaction.ACCNO,
+                    bookTitle: latestTransaction.bookTitle,
+                    author: latestTransaction.author || 'Unknown Author',
+                    publisher: latestTransaction.publisher || 'Unknown Publisher',
+                    issueDate: latestTransaction.issueDate,
+                    dueDate: latestTransaction.dueDate,
+                    status: latestTransaction.status,
+                    employeeId: faculty.employeeId,
+                    borrowerId: faculty.employeeId,
+                    borrowerType: 'faculty',
+                    transactionType: latestTransaction.transactionType,
+                    source: latestTransaction.source
+                  });
+                }
+              });
+              
+              newBorrowedBooks[faculty.employeeId] = activeBorrowedBooks;
+              console.log(`📚 Final count: ${activeBorrowedBooks.length} books for faculty ${faculty.employeeId} (using combined approach)`);
+              
+            } else {
+              // Fallback to borrowed-books data only
+              newBorrowedBooks[faculty.employeeId] = allBooks.filter(book => book.status === 'active');
+              console.log(`📚 Using borrowed-books only: ${newBorrowedBooks[faculty.employeeId].length} books for faculty ${faculty.employeeId}`);
+            }
+          } catch (historyError) {
+            console.error(`❌ Error fetching history for faculty ${faculty.employeeId}:`, historyError);
+            newBorrowedBooks[faculty.employeeId] = allBooks.filter(book => book.status === 'active');
+          }
+          
+        } catch (error) {
+          console.error(`❌ Error fetching books for faculty ${faculty.employeeId}:`, error);
+          newBorrowedBooks[faculty.employeeId] = [];
+        }
+      }
+      
+      setBorrowedBooks(newBorrowedBooks);
+      console.log('✅ Finished fetching borrowed books for all faculty');
+      
+    } catch (error) {
+      console.error('❌ Error fetching borrowed books for faculty:', error);
     }
   };
 
@@ -161,13 +298,17 @@ const FacultyList = () => {
   }, [faculties]);
 
   const getFacultyStats = () => {
-    return {
+    const stats = {
       total: faculties.length,
       byDepartment: faculties.reduce((acc, faculty) => {
-        acc[faculty.department] = (acc[faculty.department] || 0) + 1;
+        const dept = faculty.department || 'Unknown Department';
+        acc[dept] = (acc[dept] || 0) + 1;
         return acc;
       }, {})
     };
+    
+    console.log('📊 Faculty stats:', stats);
+    return stats;
   };
 
   // Add safety check to prevent the error

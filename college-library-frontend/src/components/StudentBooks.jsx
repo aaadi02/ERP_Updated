@@ -12,6 +12,121 @@ const StudentBooks = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // 🔄 Function to fetch fresh borrowed books for this student
+  const fetchFreshBorrowedBooks = async (studentId) => {
+    try {
+      console.log(`🔄 Fetching fresh borrowed books for student ${studentId}...`);
+      
+      // Use the history endpoint to get the most recent transactions
+      const response = await axios.get(`http://localhost:5000/api/issues/history`, {
+        params: {
+          studentId: studentId,
+          borrowerType: 'student',
+          page: 1,
+          limit: 50 // Get more records to ensure we get all active books
+        }
+      });
+
+      console.log(`📚 Fresh books API response for ${studentId}:`, response.data);
+
+      if (response.data.success && response.data.data && response.data.data.records) {
+        const allTransactions = response.data.data.records;
+        console.log(`📖 Found ${allTransactions.length} total transactions for ${studentId}:`, allTransactions);
+        
+        // Group transactions by book to find the latest state
+        const bookMap = new Map();
+        
+        allTransactions.forEach((transaction, index) => {
+          const bookId = transaction.bookId || transaction.ACCNO;
+          console.log(`📚 Transaction ${index + 1}:`, {
+            ACCNO: bookId,
+            transactionType: transaction.transactionType,
+            issueDate: transaction.issueDate,
+            dueDate: transaction.dueDate,
+            createdAt: transaction.createdAt,
+            status: transaction.status
+          });
+          
+          // Keep track of the latest transaction for each book
+          if (!bookMap.has(bookId) || new Date(transaction.createdAt) > new Date(bookMap.get(bookId).createdAt)) {
+            bookMap.set(bookId, transaction);
+          }
+        });
+        
+        // Filter to only include books that are currently borrowed (latest transaction is not return)
+        const activeBorrowedBooks = [];
+        bookMap.forEach((latestTransaction, bookId) => {
+          console.log(`📚 Latest transaction for book ${bookId}:`, {
+            transactionType: latestTransaction.transactionType,
+            status: latestTransaction.status,
+            dueDate: latestTransaction.dueDate,
+            createdAt: latestTransaction.createdAt
+          });
+          
+          if (latestTransaction.transactionType !== 'return' && latestTransaction.status === 'active') {
+            activeBorrowedBooks.push(latestTransaction);
+          }
+        });
+        
+        console.log(`📖 Found ${activeBorrowedBooks.length} currently borrowed books:`, activeBorrowedBooks);
+        
+        // Update the student data with fresh book information
+        setStudentData(prevData => {
+          if (!prevData) return prevData;
+          
+          const updatedData = {
+            ...prevData,
+            books: activeBorrowedBooks.map(book => ({
+              _id: book._id || book.bookId || book.ACCNO,
+              ACCNO: book.bookId || book.ACCNO,
+              TITLENAME: book.bookTitle || book.title,
+              bookTitle: book.bookTitle || book.title,
+              title: book.bookTitle || book.title,
+              issueDate: book.issueDate,
+              dueDate: book.dueDate, // This should be the latest due date from renewals
+              returnDate: book.returnDate,
+              status: book.status || 'active',
+              author: book.author || 'Unknown Author',
+              publisher: book.publisher || 'Unknown Publisher',
+              renewCount: book.renewCount || 0,
+              transactionType: book.transactionType
+            }))
+          };
+          
+          console.log('✅ Updated student data with fresh books from history:', {
+            oldBookCount: prevData.books.length,
+            newBookCount: updatedData.books.length,
+            updatedBooks: updatedData.books,
+            dueDateChanges: updatedData.books.map(newBook => {
+              const oldBook = prevData.books.find(old => old.ACCNO === newBook.ACCNO);
+              return {
+                ACCNO: newBook.ACCNO,
+                oldDueDate: oldBook?.dueDate,
+                newDueDate: newBook.dueDate,
+                changed: oldBook?.dueDate !== newBook.dueDate
+              };
+            })
+          });
+          
+          return updatedData;
+        });
+        
+        return activeBorrowedBooks;
+      } else {
+        console.log('ℹ️ No transaction history found for this student');
+        return [];
+      }
+    } catch (error) {
+      console.error('❌ Error fetching fresh borrowed books:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      return null;
+    }
+  };
+
   useEffect(() => {
     const fetchStudentBooks = async () => {
       try {
@@ -129,6 +244,99 @@ const StudentBooks = () => {
     fetchStudentBooks();
   }, [studentId]);
 
+  // 🔄 Listen for book renewal events to refresh student's borrowed books
+  useEffect(() => {
+    const handleBookRenewal = (event) => {
+      try {
+        const { borrowerId, borrowerType, bookId, timestamp } = event.detail;
+        console.log('📚 Book renewal event received in StudentBooks:', { borrowerId, borrowerType, bookId, timestamp });
+        console.log('🔍 Current student ID:', studentId);
+        
+        // Check if this renewal is for the current student
+        if (borrowerType === 'student' && borrowerId === studentId) {
+          console.log(`🔄 Renewal detected for current student ${studentId}, refreshing books...`);
+          // Refresh books after a short delay to ensure backend is updated
+          setTimeout(() => {
+            console.log('⏰ Executing delayed refresh for student books...');
+            fetchFreshBorrowedBooks(studentId);
+          }, 1000);
+        } else {
+          console.log(`ℹ️ Renewal event for different student (${borrowerId}), ignoring...`);
+        }
+      } catch (error) {
+        console.error('❌ Error handling book renewal event in StudentBooks:', error);
+      }
+    };
+
+    const handleBookIssue = (event) => {
+      try {
+        const { borrowerId, borrowerType, bookId, timestamp } = event.detail;
+        console.log('📚 Book issue event received in StudentBooks:', { borrowerId, borrowerType, bookId, timestamp });
+        
+        if (borrowerType === 'student' && borrowerId === studentId) {
+          console.log(`🔄 Book issue detected for current student ${studentId}, refreshing books...`);
+          setTimeout(() => {
+            fetchFreshBorrowedBooks(studentId);
+          }, 1000);
+        }
+      } catch (error) {
+        console.error('❌ Error handling book issue event in StudentBooks:', error);
+      }
+    };
+
+    const handleBookReturn = (event) => {
+      try {
+        const { borrowerId, borrowerType, bookId, timestamp } = event.detail;
+        console.log('📚 Book return event received in StudentBooks:', { borrowerId, borrowerType, bookId, timestamp });
+        
+        if (borrowerType === 'student' && borrowerId === studentId) {
+          console.log(`🔄 Book return detected for current student ${studentId}, refreshing books...`);
+          setTimeout(() => {
+            fetchFreshBorrowedBooks(studentId);
+          }, 1000);
+        }
+      } catch (error) {
+        console.error('❌ Error handling book return event in StudentBooks:', error);
+      }
+    };
+
+    // 🔍 DEBUG: Add test listener to verify events are working
+    const testEventListener = (event) => {
+      console.log('🚨 TEST: Book event received in StudentBooks:', event.type, event.detail);
+    };
+
+    // Add event listeners
+    window.addEventListener('bookRenewed', handleBookRenewal);
+    window.addEventListener('bookIssued', handleBookIssue);
+    window.addEventListener('bookReturned', handleBookReturn);
+    window.addEventListener('bookRenewed', testEventListener);
+    window.addEventListener('bookIssued', testEventListener);
+    window.addEventListener('bookReturned', testEventListener);
+
+    console.log('✅ Book event listeners added for StudentBooks component');
+
+    // Cleanup event listeners
+    return () => {
+      window.removeEventListener('bookRenewed', handleBookRenewal);
+      window.removeEventListener('bookIssued', handleBookIssue);
+      window.removeEventListener('bookReturned', handleBookReturn);
+      window.removeEventListener('bookRenewed', testEventListener);
+      window.removeEventListener('bookIssued', testEventListener);
+      window.removeEventListener('bookReturned', testEventListener);
+      console.log('🧹 Book event listeners removed for StudentBooks component');
+    };
+  }, [studentId]);
+
+  // 🔄 Effect to fetch fresh books data immediately after student data is loaded
+  useEffect(() => {
+    if (studentData?.student?.studentId && !loading) {
+      console.log('📚 Student data loaded, fetching fresh borrowed books...');
+      setTimeout(() => {
+        fetchFreshBorrowedBooks(studentData.student.studentId);
+      }, 500);
+    }
+  }, [studentData?.student?.studentId, loading]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-100 flex flex-col items-center justify-center w-full">
@@ -200,7 +408,80 @@ const StudentBooks = () => {
           </div>
 
           <div className="mt-6">
-            <h2 className="text-xl font-semibold text-gray-700 mb-4">Borrowed Books</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-700">Borrowed Books</h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    console.log('🔍 DEBUG: Current component state:');
+                    console.log('📚 StudentData:', studentData);
+                    console.log('📖 Books in state:', studentData.books);
+                    console.log('🗂️ LocalStorage viewStudentBooks:', localStorage.getItem('viewStudentBooks'));
+                    console.log('🗂️ LocalStorage viewBookDetails:', localStorage.getItem('viewBookDetails'));
+                    
+                    // Check specific book 297
+                    const book297 = studentData.books.find(book => book.ACCNO === '297');
+                    if (book297) {
+                      console.log('📚 Book 297 details:', book297);
+                      console.log('📅 Book 297 due date:', book297.dueDate);
+                    } else {
+                      console.log('⚠️ Book 297 not found in current state');
+                    }
+                  }}
+                  className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded hover:bg-gray-200 transition-colors flex items-center gap-1"
+                  title="Debug current state"
+                >
+                  🔍 Debug
+                </button>
+                <button
+                  onClick={() => {
+                    console.log('🧪 Testing event dispatch for student books');
+                    // Manually dispatch a test event to see if the listener is working
+                    window.dispatchEvent(new CustomEvent('bookRenewed', {
+                      detail: {
+                        borrowerId: studentData.student.studentId,
+                        borrowerType: 'student',
+                        bookId: '297',
+                        timestamp: new Date().toISOString()
+                      }
+                    }));
+                  }}
+                  className="px-3 py-1 bg-yellow-100 text-yellow-700 text-sm rounded hover:bg-yellow-200 transition-colors flex items-center gap-1"
+                  title="Test event system"
+                >
+                  🧪 Test Event
+                </button>
+                <button
+                  onClick={() => {
+                    console.log('🔄 Manual refresh button clicked for student books');
+                    console.log('🔍 Student ID:', studentData.student.studentId);
+                    console.log('🔍 Current books before refresh:', studentData.books);
+                    fetchFreshBorrowedBooks(studentData.student.studentId);
+                  }}
+                  className="px-3 py-1 bg-indigo-100 text-indigo-700 text-sm rounded hover:bg-indigo-200 transition-colors flex items-center gap-1"
+                  title="Refresh borrowed books"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh
+                </button>
+                <button
+                  onClick={() => {
+                    console.log('🗑️ Force refresh - clearing localStorage and fetching fresh data');
+                    // Clear localStorage to force fresh data fetch
+                    localStorage.removeItem('viewStudentBooks');
+                    localStorage.removeItem('viewBookDetails');
+                    // Force page reload to get completely fresh data
+                    window.location.reload();
+                  }}
+                  className="px-3 py-1 bg-red-100 text-red-700 text-sm rounded hover:bg-red-200 transition-colors flex items-center gap-1"
+                  title="Force refresh (clears cache)"
+                >
+                  🗑️ Force Refresh
+                </button>
+              </div>
+            </div>
             {studentData.books.length === 0 ? (
               <div className="text-center p-6 bg-gray-50 rounded-lg">
                 <p className="text-gray-600">No books currently borrowed</p>

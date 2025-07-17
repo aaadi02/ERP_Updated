@@ -80,7 +80,7 @@ const BookDetails = () => {
         
         if (bookData) {
           // Preserve all original data fields
-          setBook({
+          const initialBook = {
             ...bookData,
             // Map fields while keeping originals, preferring standard names
             title: bookData.TITLENAME || bookData.title || bookData.bookTitle,
@@ -106,12 +106,20 @@ const BookDetails = () => {
             vendor_city: bookData['VENDER CITY'] || bookData.vendor_city || bookData.vendorCity,
             acc_date: bookData.ACCDATE || bookData.acc_date || bookData.accessionDate,
             ref_cir: bookData.REFCIR || bookData.ref_cir,
-            // Keep the borrower info from localStorage if it exists
+            // Start with localStorage data but we'll refresh it immediately
             borrower: storedData.borrower,
             issueDate: storedData.issueDate,
             dueDate: storedData.dueDate,
             returnDate: storedData.returnDate
-          });
+          };
+          
+          setBook(initialBook);
+          
+          // 🔄 IMPORTANT: Immediately fetch fresh borrowing details to override localStorage data
+          console.log('📚 Initial book loaded, fetching fresh borrowing details...');
+          setTimeout(() => {
+            fetchCurrentBorrowingDetailsImmediate(initialBook);
+          }, 100);
         } else {
           // If backend fetch fails, fall back to localStorage data
           if (storedData && storedData.ACCNO === accno) {
@@ -161,6 +169,188 @@ const BookDetails = () => {
 
     fetchBookDetails();
   }, [accno]);
+
+  // 🔄 Function to fetch fresh borrowing details for the current book (immediate version for initial load)
+  const fetchCurrentBorrowingDetailsImmediate = async (currentBook) => {
+    const bookToUse = currentBook || book;
+    if (!bookToUse || !accno) {
+      console.log('⚠️ Cannot refresh borrowing details - missing book or accno:', { book: !!bookToUse, accno });
+      return;
+    }
+    
+    try {
+      console.log(`🔄 Fetching fresh borrowing details for book ${accno} (immediate)...`);
+      
+      // Try to get current issue details for this book
+      const response = await axios.get(`http://localhost:5000/api/issues/history`, {
+        params: {
+          bookId: accno,
+          status: 'active',
+          limit: 1,
+          transactionType: 'all'
+        }
+      });
+
+      console.log('🔍 API response for borrowing details (immediate):', response.data);
+
+      if (response.data.success && response.data.data.records && response.data.data.records.length > 0) {
+        const latestRecord = response.data.data.records[0];
+        console.log('📚 Latest borrowing record found (immediate):', latestRecord);
+        
+        const oldDueDate = bookToUse.dueDate;
+        const newDueDate = latestRecord.currentDueDate || latestRecord.dueDate;
+        
+        console.log('📅 Due date comparison (immediate):', {
+          oldDueDate,
+          newDueDate,
+          changed: oldDueDate !== newDueDate
+        });
+        
+        // Update the book state with fresh borrowing details
+        setBook(prevBook => {
+          const updatedBook = {
+            ...prevBook,
+            borrower: {
+              name: latestRecord.studentName || latestRecord.facultyName || prevBook.borrower?.name || 'Unknown',
+              department: latestRecord.department || prevBook.borrower?.department || 'Unknown',
+              semester: latestRecord.semester || prevBook.borrower?.semester || 'N/A'
+            },
+            issueDate: latestRecord.issueDate || prevBook.issueDate,
+            dueDate: newDueDate || prevBook.dueDate,
+            returnDate: latestRecord.returnDate || prevBook.returnDate,
+            // Update renewal count if available
+            renewCount: latestRecord.renewCount || prevBook.renewCount || 0
+          };
+          
+          console.log('✅ Book state updated with fresh details (immediate):', {
+            oldBook: prevBook,
+            newBook: updatedBook,
+            dueDateChanged: prevBook.dueDate !== updatedBook.dueDate
+          });
+          
+          return updatedBook;
+        });
+        
+        console.log('✅ Book details refreshed with new due date (immediate):', newDueDate);
+      } else {
+        console.log('ℹ️ No active borrowing records found for this book (immediate)');
+      }
+    } catch (error) {
+      console.error('❌ Error fetching current borrowing details (immediate):', error);
+    }
+  };
+
+  // 🔄 Function to fetch fresh borrowing details for the current book
+  const fetchCurrentBorrowingDetails = async () => {
+    if (!book || !accno) {
+      console.log('⚠️ Cannot refresh borrowing details - missing book or accno:', { book: !!book, accno });
+      return;
+    }
+    
+    try {
+      console.log(`🔄 Refreshing borrowing details for book ${accno}...`);
+      
+      // Try to get current issue details for this book
+      const response = await axios.get(`http://localhost:5000/api/issues/history`, {
+        params: {
+          bookId: accno,
+          status: 'active',
+          limit: 1,
+          transactionType: 'all'
+        }
+      });
+
+      console.log('🔍 API response for borrowing details:', response.data);
+
+      if (response.data.success && response.data.data.records && response.data.data.records.length > 0) {
+        const latestRecord = response.data.data.records[0];
+        console.log('📚 Latest borrowing record found:', latestRecord);
+        
+        const oldDueDate = book.dueDate;
+        const newDueDate = latestRecord.currentDueDate || latestRecord.dueDate;
+        
+        console.log('📅 Due date comparison:', {
+          oldDueDate,
+          newDueDate,
+          changed: oldDueDate !== newDueDate
+        });
+        
+        // Update the book state with fresh borrowing details
+        setBook(prevBook => {
+          const updatedBook = {
+            ...prevBook,
+            borrower: {
+              name: latestRecord.studentName || latestRecord.facultyName || prevBook.borrower?.name || 'Unknown',
+              department: latestRecord.department || prevBook.borrower?.department || 'Unknown',
+              semester: latestRecord.semester || prevBook.borrower?.semester || 'N/A'
+            },
+            issueDate: latestRecord.issueDate || prevBook.issueDate,
+            dueDate: newDueDate || prevBook.dueDate,
+            returnDate: latestRecord.returnDate || prevBook.returnDate,
+            // Update renewal count if available
+            renewCount: latestRecord.renewCount || prevBook.renewCount || 0
+          };
+          
+          console.log('✅ Book state updated with new details:', {
+            oldBook: prevBook,
+            newBook: updatedBook,
+            dueDateChanged: prevBook.dueDate !== updatedBook.dueDate
+          });
+          
+          return updatedBook;
+        });
+        
+        console.log('✅ Book details refreshed with new due date:', newDueDate);
+      } else {
+        console.log('ℹ️ No active borrowing records found for this book');
+      }
+    } catch (error) {
+      console.error('❌ Error fetching current borrowing details:', error);
+    }
+  };
+
+  // 🔄 Listen for book renewal events to refresh borrowing details
+  useEffect(() => {
+    const handleBookRenewal = (event) => {
+      try {
+        const { bookId, borrowerId, borrowerType, timestamp } = event.detail;
+        console.log('📚 Book renewal event received in BookDetails:', { bookId, borrowerId, borrowerType, timestamp });
+        console.log('🔍 Current book ACCNO:', accno, 'Book object ACCNO:', book?.ACCNO);
+        
+        // Check if this renewal is for the current book
+        if (bookId === accno || bookId === book?.ACCNO || bookId === book?.accessionNumber) {
+          console.log(`🔄 Renewal detected for current book ${accno}, refreshing details...`);
+          // Refresh borrowing details after a short delay to ensure backend is updated
+          setTimeout(() => {
+            console.log('⏰ Executing delayed refresh for borrowing details...');
+            fetchCurrentBorrowingDetails();
+          }, 1000); // Increased delay to 1 second
+        } else {
+          console.log(`ℹ️ Renewal event for different book (${bookId}), ignoring...`);
+        }
+      } catch (error) {
+        console.error('❌ Error handling book renewal event:', error);
+      }
+    };
+
+    // 🔍 DEBUG: Add test listener to verify events are working
+    const testEventListener = (event) => {
+      console.log('🚨 TEST: Book renewal event received in BookDetails:', event.type, event.detail);
+    };
+
+    // Add event listeners
+    window.addEventListener('bookRenewed', handleBookRenewal);
+    window.addEventListener('bookRenewed', testEventListener);
+
+    console.log('✅ Book renewal event listeners added for BookDetails component');
+
+    // Cleanup event listener
+    return () => {
+      window.removeEventListener('bookRenewed', handleBookRenewal);
+      window.removeEventListener('bookRenewed', testEventListener);
+      console.log('🧹 Book renewal event listeners removed for BookDetails component');
+    };
+  }, [accno, book?.ACCNO, book?.accessionNumber]); // Include all possible book identifiers
 
   if (loading) {
     return (
@@ -386,12 +576,27 @@ const BookDetails = () => {
             </div>
 
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-gray-700 border-b pb-2 flex items-center gap-2">
-                <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                Borrowing Details
-              </h2>
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-semibold text-gray-700 border-b pb-2 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  Borrowing Details
+                </h2>
+                <button
+                  onClick={() => {
+                    console.log('🔄 Manual refresh button clicked');
+                    fetchCurrentBorrowingDetails();
+                  }}
+                  className="px-3 py-1 bg-indigo-100 text-indigo-700 text-sm rounded hover:bg-indigo-200 transition-colors flex items-center gap-1"
+                  title="Refresh borrowing details"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh
+                </button>
+              </div>
               {book.borrower && (
                 <div className="space-y-2">
                   <div>

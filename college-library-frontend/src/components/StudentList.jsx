@@ -2,21 +2,243 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
-// Note: Now using real student data from StudentManagement.js model via /api/students
-// Book data is currently mock since book issue management endpoints are not yet implemented
-
 const StudentList = () => {
   const [students, setStudents] = useState([]);
-  const [loading, setLoading] = useState(true);``
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('all');
   const [borrowedBooks, setBorrowedBooks] = useState({});
   const navigate = useNavigate();
 
-  const API_URL = 'http://localhost:5000/api/faculty/faculties';
+  // Function to fetch borrowed books count for a student/faculty member
+  const fetchBorrowedBooks = async (borrowerId, borrowerType = 'student') => {
+    try {
+      console.log(`🔍 Fetching borrowed books for ${borrowerType} ID: ${borrowerId}`);
+      
+      // First try the main API with includeRenewed parameter
+      const response = await axios.get(`http://localhost:5000/api/issues/borrowed-books`, {
+        params: {
+          borrowerId: borrowerId,
+          borrowerType: borrowerType,
+          includeRenewed: true,
+          status: 'all'
+        }
+      });
 
-  let isCheckboxChecked = false;
+      let books = [];
+      if (response.data.success && response.data.data) {
+        books = response.data.data;
+        console.log(`📖 Found ${books.length} books via main API for ${borrowerId}:`, books.map(b => b.title || b.bookTitle));
+        
+        // 🔍 ENHANCED DEBUG: Log the complete API response for troubleshooting
+        console.log(`🚨 DEBUG: Complete API response for ${borrowerId}:`, {
+          success: response.data.success,
+          dataType: typeof response.data.data,
+          dataLength: Array.isArray(response.data.data) ? response.data.data.length : 'not array',
+          fullData: response.data.data,
+          completeResponse: response.data
+        });
+      }
+
+      // Also try alternative parameter names if no books found
+      if (books.length === 0) {
+        console.log(`🔄 No books found with borrowerId, trying with ${borrowerType}Id parameter...`);
+        try {
+          const altResponse = await axios.get(`http://localhost:5000/api/issues/borrowed-books`, {
+            params: {
+              [`${borrowerType}Id`]: borrowerId,
+              includeRenewed: true,
+              status: 'all'
+            }
+          });
+          
+          if (altResponse.data.success && altResponse.data.data) {
+            books = altResponse.data.data;
+            console.log(`📖 Found ${books.length} books via alternative API for ${borrowerId}:`, books.map(b => b.title || b.bookTitle));
+          }
+        } catch (altError) {
+          console.warn(`Alternative API call failed for ${borrowerId}:`, altError.message);
+        }
+      }
+
+      // If we still got fewer books than expected, try to get from history API as well
+      // 🚧 TEMPORARILY DISABLED to debug cross-contamination issue
+      if (false && books.length < 2) {
+        console.log(`🔄 Only found ${books.length} books for ${borrowerId}, checking history for more...`);
+        try {
+          // 🔧 FIX: Use proper student-specific parameters for history API
+          const historyParams = {
+            status: 'active',
+            limit: 10,
+            borrowerType: borrowerType
+          };
+          
+          // Add student-specific parameter
+          if (borrowerType === 'student') {
+            historyParams.studentId = borrowerId;
+          } else {
+            historyParams.employeeId = borrowerId;
+          }
+          
+          console.log(`📚 Fetching history for ${borrowerId} with params:`, historyParams);
+          
+          const historyResponse = await axios.get(`http://localhost:5000/api/issues/history`, {
+            params: historyParams
+          });
+
+          console.log(`📚 History API response for ${borrowerId}:`, historyResponse.data);
+
+          if (historyResponse.data.success && historyResponse.data.data.records) {
+            // 🔧 FIX: Double-check that records belong to this specific student
+            const historyBooks = historyResponse.data.data.records.filter(record => {
+              const recordMatches = (
+                (record.status === 'issued' || record.status === 'renewed' || record.transactionType === 'renew') &&
+                (
+                  (borrowerType === 'student' && record.studentId === borrowerId) ||
+                  (borrowerType === 'faculty' && record.employeeId === borrowerId)
+                )
+              );
+              
+              if (!recordMatches && record.studentId) {
+                console.log(`� Filtering out record for different student: ${record.studentId} (looking for ${borrowerId})`);
+              }
+              
+              return recordMatches;
+            });
+            
+            console.log(`�📚 Found ${historyBooks.length} additional books from history for ${borrowerId} (after filtering)`);
+            
+            // Merge with existing books, avoiding duplicates
+            historyBooks.forEach(historyBook => {
+              const existingBook = books.find(book => 
+                book.ACCNO === historyBook.bookId || 
+                book.ACCNO === historyBook.ACCNO ||
+                book.bookId === historyBook.bookId ||
+                book.bookTitle === historyBook.bookTitle ||
+                book.title === historyBook.bookTitle
+              );
+              if (!existingBook) {
+                console.log(`➕ Adding book from history: ${historyBook.bookTitle || historyBook.title} for student ${borrowerId}`);
+                books.push({
+                  ...historyBook,
+                  ACCNO: historyBook.bookId || historyBook.ACCNO,
+                  bookTitle: historyBook.bookTitle,
+                  author: historyBook.author,
+                  publisher: historyBook.publisher
+                });
+              } else {
+                console.log(`⚠️ Duplicate book found, skipping: ${historyBook.bookTitle || historyBook.title}`);
+              }
+            });
+          }
+        } catch (historyError) {
+          console.warn(`Could not fetch history for ${borrowerId}:`, historyError);
+          
+          // Try alternative history API call
+          try {
+            const altHistoryResponse = await axios.get(`http://localhost:5000/api/issues/history`, {
+              params: {
+                [`${borrowerType}Id`]: borrowerId,
+                status: 'active',
+                limit: 10
+              }
+            });
+            
+            console.log(`📚 Alternative history API response for ${borrowerId}:`, altHistoryResponse.data);
+            
+            if (altHistoryResponse.data.success && altHistoryResponse.data.data.records) {
+              // 🔧 FIX: Double-check that records belong to this specific student in alternative call too
+              const historyBooks = altHistoryResponse.data.data.records.filter(record => {
+                const recordMatches = (
+                  (record.status === 'issued' || record.status === 'renewed' || record.transactionType === 'renew') &&
+                  (
+                    (borrowerType === 'student' && record.studentId === borrowerId) ||
+                    (borrowerType === 'faculty' && record.employeeId === borrowerId)
+                  )
+                );
+                
+                if (!recordMatches && record.studentId) {
+                  console.log(`� Filtering out alt record for different student: ${record.studentId} (looking for ${borrowerId})`);
+                }
+                
+                return recordMatches;
+              });
+              
+              console.log(`�📚 Found ${historyBooks.length} books from alternative history for ${borrowerId} (after filtering)`);
+              
+              historyBooks.forEach(historyBook => {
+                const existingBook = books.find(book => 
+                  book.ACCNO === historyBook.bookId || 
+                  book.ACCNO === historyBook.ACCNO ||
+                  book.bookId === historyBook.bookId ||
+                  book.bookTitle === historyBook.bookTitle ||
+                  book.title === historyBook.bookTitle
+                );
+                if (!existingBook) {
+                  console.log(`➕ Adding book from alt history: ${historyBook.bookTitle || historyBook.title} for student ${borrowerId}`);
+                  books.push({
+                    ...historyBook,
+                    ACCNO: historyBook.bookId || historyBook.ACCNO,
+                    bookTitle: historyBook.bookTitle,
+                    author: historyBook.author,
+                    publisher: historyBook.publisher
+                  });
+                } else {
+                  console.log(`⚠️ Duplicate book found in alt history, skipping: ${historyBook.bookTitle || historyBook.title}`);
+                }
+              });
+            }
+          } catch (altHistoryError) {
+            console.warn(`Alternative history API also failed for ${borrowerId}:`, altHistoryError.message);
+          }
+        }
+      }
+
+      console.log(`✅ Total issued books for ${borrowerId}: ${books.length}`);
+      
+      // Update state with real borrowed books - ALWAYS set the state for this specific student
+      setBorrowedBooks(prev => {
+        const newState = {
+          ...prev,
+          [borrowerId]: books // This will be an empty array if no books found
+        };
+        console.log(`📝 Updated borrowedBooks state for ${borrowerId}:`, {
+          studentId: borrowerId,
+          bookCount: books.length,
+          books: books,
+          oldState: prev[borrowerId] || [],
+          newState: newState[borrowerId],
+          fullState: newState,
+          timestamp: new Date().toISOString()
+        });
+        return newState;
+      });
+      
+    } catch (err) {
+      console.error(`❌ Error checking books for ${borrowerType} ${borrowerId}:`, err);
+      // Only log 404 errors as info since no books issued is expected
+      if (err.response?.status === 404) {
+        console.log(`No books currently issued to ${borrowerType} ${borrowerId}`);
+      } else {
+        console.error("Detailed error:", err.response?.data);
+      }
+      // ALWAYS set state even on error - set empty array for this specific student
+      setBorrowedBooks(prev => {
+        const newState = {
+          ...prev,
+          [borrowerId]: []
+        };
+        console.log(`📝 Updated borrowedBooks state (ERROR) for ${borrowerId}:`, {
+          studentId: borrowerId,
+          bookCount: 0,
+          error: err.message,
+          fullState: newState
+        });
+        return newState;
+      });
+    }
+  };
 
   // Helper function to extract semester
   const extractSemester = (semesterData) => {
@@ -103,17 +325,6 @@ const StudentList = () => {
                               extractSemester(student.sem) || 
                               '';
         
-        // Debug log for semester
-        if (student.studentId) {
-          console.log(`Student ${student.studentId} - Data:`, {
-            semester: { original: student.semester, extracted: semesterNumber },
-            stream: { original: student.stream, type: typeof student.stream },
-            department: { original: student.department, type: typeof student.department },
-            course: student.course,
-            branch: student.branch
-          });
-        }
-        
         const subjectCount = student.subjects?.length || 0;
         const backlogCount = student.backlogs?.length || 0;
         const semesterRecordsCount = student.semesterRecords?.length || 0;
@@ -161,14 +372,6 @@ const StudentList = () => {
       });
 
       setStudents(formattedStudents);
-
-      // Remove this block to avoid duplicate API calls and race conditions
-      // formattedStudents.forEach(student => {
-      //   if (student.studentId) {
-      //     console.log('Fetching borrowed books for:', student.studentId, 'Raw:', student);
-      //     fetchBorrowedBooks(student.studentId, 'student');
-      //   }
-      // });
     } catch (error) {
       console.error('Error fetching students:', error);
       if (error.response) {
@@ -183,78 +386,6 @@ const StudentList = () => {
     }
   };
 
-  const fetchBorrowedBooks = async (borrowerId, borrowerType) => {
-    if (!borrowerId || !borrowerType) {
-      console.warn("Missing borrowerId or borrowerType:", { borrowerId, borrowerType });
-      return;
-    }
-    
-    try {
-      console.log(`🔍 Generating mock borrowed books for ${borrowerType}: ${borrowerId}`);
-      
-      // NOTE: Using mock data since book issue management endpoints are not yet implemented
-      // TODO: Replace with real API call to /api/issues/borrowed-books when book system is ready
-      
-      // Generate random mock books for demonstration
-      const randomBookCount = Math.floor(Math.random() * 4); // 0-3 books per student
-      const books = [];
-      
-      const bookTitles = [
-        'Introduction to Computer Science',
-        'Data Structures and Algorithms', 
-        'Database Management Systems',
-        'Operating Systems Concepts',
-        'Software Engineering',
-        'Digital Electronics',
-        'Engineering Mechanics',
-        'Thermodynamics',
-        'Machine Design',
-        'Network Security'
-      ];
-      
-      for (let i = 0; i < randomBookCount; i++) {
-        books.push({
-          ACCNO: `BB/${Math.floor(Math.random() * 9000) + 1000}`,
-          bookTitle: bookTitles[Math.floor(Math.random() * bookTitles.length)],
-          issueDate: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          dueDate: new Date(Date.now() + Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          status: 'active',
-          author: 'Academic Author',
-          publisher: 'Academic Press'
-        });
-      }
-
-      // Format the books data
-      const formattedBooks = books.map(book => ({
-        ACCNO: book.ACCNO,
-        bookTitle: book.bookTitle,
-        issueDate: book.issueDate,
-        dueDate: book.dueDate,
-        status: book.status,
-        studentId: borrowerId,
-        borrowerId: borrowerId,
-        borrowerType: borrowerType,
-        author: book.author,
-        publisher: book.publisher
-      }));
-
-      console.log(`📚 Generated ${formattedBooks.length} mock books for ${borrowerId}`);
-      
-      // Update state with mock data
-      setBorrowedBooks(prev => ({
-        ...prev,
-        [borrowerId]: formattedBooks
-      }));
-      
-    } catch (err) {
-      console.error(`❌ Error generating mock books for ${borrowerType} ${borrowerId}:`, err);
-      setBorrowedBooks(prev => ({
-        ...prev,
-        [borrowerId]: []
-      }));
-    }
-  };
-
   // 🔁 Fetch students initially
   useEffect(() => {
     fetchStudents();
@@ -266,14 +397,19 @@ const StudentList = () => {
       if (students.length > 0) {
         console.log('📚 Fetching borrowed books for', students.length, 'students');
         
-        // Clear the borrowedBooks state before fetching new data
-        setBorrowedBooks({});
+        // DON'T clear the borrowedBooks state - let it accumulate per student
+        // setBorrowedBooks({});
         
         // Fetch books for each student
         for (const student of students) {
           const studentId = student.studentId || student._id;
           if (studentId) {
-            console.log('🔍 Fetching books for student:', studentId, student.name);
+            console.log('🔍 Fetching books for student:', {
+              studentId: studentId, 
+              name: student.name,
+              enrollmentNumber: student.enrollmentNumber,
+              rawStudent: student
+            });
             try {
               await fetchBorrowedBooks(studentId, 'student');
               // Add a small delay between requests to prevent overwhelming the server
@@ -281,6 +417,8 @@ const StudentList = () => {
             } catch (error) {
               console.error(`Error fetching books for student ${studentId}:`, error);
             }
+          } else {
+            console.warn('⚠️ Student has no valid ID:', student);
           }
         }
         
@@ -291,12 +429,85 @@ const StudentList = () => {
     fetchAllBorrowedBooks();
   }, [students]);
 
+  // 🔄 Listen for book renewal and issue events to update specific student data
+  useEffect(() => {
+    const handleBookRenewal = (event) => {
+      const { borrowerId, borrowerType, bookId, timestamp } = event.detail;
+      console.log('📚 Book renewal event received in StudentList:', { borrowerId, borrowerType, bookId, timestamp });
+      console.log('🔍 Current borrowedBooks state before refresh:', borrowedBooks);
+      
+      // Only update if it's a student renewal
+      if (borrowerType === 'student') {
+        // Re-fetch books for the specific student who renewed the book
+        console.log(`🔄 About to refresh books for student ${borrowerId} after renewal`);
+        fetchBorrowedBooks(borrowerId, 'student');
+        console.log(`🔄 Refreshed books for student ${borrowerId} after renewal`);
+      } else {
+        console.log(`⚠️ Skipping refresh - borrowerType is ${borrowerType}, not student`);
+      }
+    };
+
+    const handleBookIssue = (event) => {
+      const { borrowerId, borrowerType, bookId, timestamp } = event.detail;
+      console.log('📚 Book issue event received:', { borrowerId, borrowerType, bookId, timestamp });
+      
+      // Only update if it's a student issue
+      if (borrowerType === 'student') {
+        // Re-fetch books for the specific student who got the book
+        fetchBorrowedBooks(borrowerId, 'student');
+        console.log(`🔄 Refreshed books for student ${borrowerId} after issue`);
+      }
+    };
+
+    const handleBookReturn = (event) => {
+      const { borrowerId, borrowerType, bookId, timestamp } = event.detail;
+      console.log('📚 Book return event received:', { borrowerId, borrowerType, bookId, timestamp });
+      
+      // Only update if it's a student return
+      if (borrowerType === 'student') {
+        // Re-fetch books for the specific student who returned the book
+        fetchBorrowedBooks(borrowerId, 'student');
+        console.log(`🔄 Refreshed books for student ${borrowerId} after return`);
+      }
+    };
+
+    // Add event listeners for book renewals, issues, and returns
+    window.addEventListener('bookRenewed', handleBookRenewal);
+    window.addEventListener('bookIssued', handleBookIssue);
+    window.addEventListener('bookReturned', handleBookReturn);
+
+    // 🔍 DEBUG: Add test listener to verify events are working
+    const testEventListener = (event) => {
+      console.log('🚨 TEST: Any custom event received:', event.type, event.detail);
+    };
+    window.addEventListener('bookRenewed', testEventListener);
+    window.addEventListener('bookIssued', testEventListener);
+    window.addEventListener('bookReturned', testEventListener);
+
+    // Cleanup event listeners
+    return () => {
+      window.removeEventListener('bookRenewed', handleBookRenewal);
+      window.removeEventListener('bookIssued', handleBookIssue);
+      window.removeEventListener('bookReturned', handleBookReturn);
+      window.removeEventListener('bookRenewed', testEventListener);
+      window.removeEventListener('bookIssued', testEventListener);
+      window.removeEventListener('bookReturned', testEventListener);
+    };
+  }, []); // Empty dependency array since we only want to set up the listener once
 
   const getStudentStats = () => {
-    const totalBorrowedBooks = Object.values(borrowedBooks).reduce(
-      (sum, books) => sum + (Array.isArray(books) ? books.length : 0), 
-      0
-    );
+    // 🔍 DEBUG: Log the complete borrowedBooks state to see what's being counted
+    console.log('🚨 DEBUG: Complete borrowedBooks state:', borrowedBooks);
+    
+    let totalBorrowedBooks = 0;
+    Object.entries(borrowedBooks).forEach(([studentId, books]) => {
+      if (Array.isArray(books)) {
+        console.log(`📊 Student ${studentId} has ${books.length} books:`, books.map(b => b.title || b.bookTitle || 'No title'));
+        totalBorrowedBooks += books.length;
+      }
+    });
+    
+    console.log(`📊 Total calculated active books: ${totalBorrowedBooks}`);
     
     return {
       total: students.length,
@@ -311,20 +522,6 @@ const StudentList = () => {
       totalBorrowedBooks
     };
   };
-
-  const groupByBorrowerId = (books) => {
-    const grouped = {};
-    books.forEach(book => {
-      const id = book.borrowerId;
-      if (!grouped[id]) grouped[id] = [];
-      grouped[id].push(book);
-    });
-    return grouped;
-  };
-
-  // Remove duplicate useEffect for fetching borrowed books
-  // This was causing conflicts with the main useEffect above
-
 
   const filteredStudents = students.filter(student => {
     if (!student) return false;
@@ -370,20 +567,6 @@ const StudentList = () => {
         </div>
       </div>
     );
-  }
-
-  const handleViewBook = (book) => {
-    // Store book and borrower details in localStorage
-    localStorage.setItem('viewBookDetails', JSON.stringify({
-      ...book,
-      borrower: {
-        name: book.borrowerName || book.studentName,
-        department: book.department,
-        semester: book.semester
-      }
-    }));
-    // Navigate using ACCNO instead of _id
-    navigate('/book-details/' + book.ACCNO);
   }
 
   return (
@@ -521,6 +704,7 @@ const StudentList = () => {
                               type: 'student',
                               studentId: student.studentId || student._id,
                               name: student.name,
+                              enrollmentNumber: student.enrollmentNumber,
                               semester: student.semester,
                               department: student.department,
                               stream: student.stream,
@@ -550,6 +734,7 @@ const StudentList = () => {
                               type: 'student',
                               studentId: student.studentId || student._id,
                               name: student.name,
+                              enrollmentNumber: student.enrollmentNumber,
                               semester: student.semester,
                               department: student.department,
                               stream: student.stream,

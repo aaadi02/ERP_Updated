@@ -44,6 +44,12 @@ const BookActions = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [issuedBookDetails, setIssuedBookDetails] = useState(null)
+  const [showReturnModal, setShowReturnModal] = useState(false)
+  const [returnBookDetails, setReturnBookDetails] = useState(null)
+  const [showRenewSuccessModal, setShowRenewSuccessModal] = useState(false)
+  const [renewedBookDetails, setRenewedBookDetails] = useState(null)
   const [history, setHistory] = useState([])
   const [filters, setFilters] = useState({
     ACCNO: "",
@@ -97,12 +103,24 @@ const BookActions = () => {
           btNumber: borrowerData.studentId || '',
           studentId: borrowerData.studentId || '',
           studentName: borrowerData.name || '',
+          rollNumber: borrowerData.enrollmentNumber || borrowerData.studentId || '',
           department: borrowerData.department || '',
-          semester: borrowerData.semester || '',
+          semester: borrowerData.semester?.toString() || '',
           course: borrowerData.course || borrowerData.stream || '',
           email: borrowerData.email || '',
           phone: borrowerData.phone || '',
         }));
+
+        console.log('Populated student form data:', {
+          studentId: borrowerData.studentId,
+          studentName: borrowerData.name,
+          rollNumber: borrowerData.enrollmentNumber || borrowerData.studentId,
+          department: borrowerData.department,
+          semester: borrowerData.semester,
+          course: borrowerData.course || borrowerData.stream,
+          email: borrowerData.email,
+          phone: borrowerData.phone
+        });
 
         // Fetch issued books for this student
         if (borrowerData.studentId) {
@@ -144,12 +162,24 @@ const BookActions = () => {
               btNumber: borrowerData.studentId || '',
               studentId: borrowerData.studentId || '',
               studentName: borrowerData.name || '',
+              rollNumber: borrowerData.enrollmentNumber || borrowerData.studentId || '',
               department: borrowerData.department || '',
-              semester: borrowerData.semester || '',
+              semester: borrowerData.semester?.toString() || '',
               course: borrowerData.course || borrowerData.stream || '',
               email: borrowerData.email || '',
               phone: borrowerData.phone || '',
             }));
+
+            console.log('Populated student form data from localStorage:', {
+              studentId: borrowerData.studentId,
+              studentName: borrowerData.name,
+              rollNumber: borrowerData.enrollmentNumber || borrowerData.studentId,
+              department: borrowerData.department,
+              semester: borrowerData.semester,
+              course: borrowerData.course || borrowerData.stream,
+              email: borrowerData.email,
+              phone: borrowerData.phone
+            });
 
             // Fetch issued books for this student
             if (borrowerData.studentId) {
@@ -198,6 +228,17 @@ const BookActions = () => {
         dueDate: "",
       }))
     }
+  }
+
+  // Clear success messages when switching tabs
+  const handleTabChange = (tab) => {
+    setActiveForm(tab)
+    setSuccess("")
+    setError("")
+    setShowSuccessModal(false)
+    setShowReturnModal(false)
+    setIssuedBookDetails(null)
+    setReturnBookDetails(null)
   }
 
   const fetchBorrowerDetails = async (id, type) => {
@@ -633,8 +674,15 @@ const BookActions = () => {
         return
       }
 
-      // Removed borrower validation for lost book
+      // Add borrower validation for lost book
+      const borrowerId = formData.borrowerType === "student" ? formData.studentId : formData.employeeId;
+      if (!borrowerId) {
+        setError(`${formData.borrowerType === "student" ? "Student ID" : "Employee ID"} is required to record who lost the book`)
+        setLoading(false)
+        return
+      }
 
+      // Prepare lost book data with borrower information
       const lostBookData = {
         bookId: formData.ACCNO,
         bookTitle: formData.bookTitle,
@@ -647,6 +695,24 @@ const BookActions = () => {
         lostRemarks: formData.lostRemarks || "",
         status: 'lost',
         transactionType: 'lost',
+        borrowerType: formData.borrowerType,
+        // Add borrower-specific fields
+        ...(formData.borrowerType === "student" ? {
+          studentId: formData.studentId,
+          studentName: formData.studentName,
+          department: formData.department,
+          course: formData.course,
+          semester: formData.semester,
+          borrowerId: formData.studentId
+        } : {
+          employeeId: formData.employeeId,
+          facultyName: formData.firstName,
+          department: formData.department,
+          designation: formData.designation,
+          borrowerId: formData.employeeId
+        }),
+        email: formData.email,
+        phone: formData.phone,
         dueDate: new Date(), // Setting current date as due date for lost books
       }
 
@@ -657,19 +723,65 @@ const BookActions = () => {
 
       if (response.data.success) {
         setSuccess("Lost book entry recorded successfully!")
-        setFormData((prev) => ({
-          ...prev,
-          ACCNO: "",
-          bookTitle: "",
-          author: "",
-          publisher: "",
-          isbn: "",
-          SERIESCODE: "",
-          lostDate: new Date().toISOString().split("T")[0],
-          lostReason: "",
-          replacementCost: "",
-          lostRemarks: "",
-        }))
+        
+        // 🔄 IMPORTANT: Notify parent components about the lost book
+        // This ensures accurate book counts and proper state management
+        if (window.dispatchEvent) {
+          const borrowerId = formData.borrowerType === "student" ? formData.studentId : formData.employeeId;
+          window.dispatchEvent(new CustomEvent('bookLost', {
+            detail: {
+              borrowerId: borrowerId,
+              borrowerType: formData.borrowerType,
+              bookId: formData.ACCNO,
+              timestamp: new Date().toISOString()
+            }
+          }));
+        }
+        
+        // Clear form data
+        if (formData.borrowerType === "student") {
+          setFormData((prev) => ({
+            ...prev,
+            ACCNO: "",
+            bookTitle: "",
+            author: "",
+            publisher: "",
+            isbn: "",
+            SERIESCODE: "",
+            studentId: "",
+            studentName: "",
+            department: "",
+            course: "",
+            semester: "",
+            email: "",
+            phone: "",
+            lostDate: new Date().toISOString().split("T")[0],
+            lostReason: "",
+            replacementCost: "",
+            lostRemarks: "",
+          }))
+        } else {
+          setFormData((prev) => ({
+            ...prev,
+            ACCNO: "",
+            bookTitle: "",
+            author: "",
+            publisher: "",
+            isbn: "",
+            SERIESCODE: "",
+            employeeId: "",
+            firstName: "",
+            department: "",
+            designation: "",
+            email: "",
+            phone: "",
+            lostDate: new Date().toISOString().split("T")[0],
+            lostReason: "",
+            replacementCost: "",
+            lostRemarks: "",
+          }))
+        }
+        
         // Refresh history to show the new lost record
         fetchHistory();
       } else {
@@ -799,6 +911,41 @@ const BookActions = () => {
       if (issueResponse.data.success) {
         setSuccess("Book issued successfully!")
         
+        // Store issued book details for modal
+        setIssuedBookDetails({
+          ACCNO: formData.ACCNO,
+          bookTitle: formData.bookTitle,
+          author: formData.author,
+          publisher: formData.publisher,
+          borrowerName: formData.borrowerType === "student" ? formData.studentName : formData.firstName,
+          borrowerId: borrowerId,
+          borrowerType: formData.borrowerType,
+          department: formData.department,
+          course: formData.course,
+          semester: formData.semester,
+          designation: formData.designation,
+          issueDate: formData.issueDate,
+          dueDate: formData.dueDate,
+          email: formData.email,
+          phone: formData.phone
+        })
+        
+        // Show success modal
+        setShowSuccessModal(true)
+        
+        // 🔄 IMPORTANT: Notify parent components about the book issue
+        // This prevents cross-contamination and ensures accurate book counts
+        if (window.dispatchEvent) {
+          window.dispatchEvent(new CustomEvent('bookIssued', {
+            detail: {
+              borrowerId: borrowerId,
+              borrowerType: formData.borrowerType,
+              bookId: formData.ACCNO,
+              timestamp: new Date().toISOString()
+            }
+          }));
+        }
+        
         // Clear form data based on borrower type
         if (formData.borrowerType === "student") {
           setFormData((prev) => ({
@@ -899,13 +1046,58 @@ const BookActions = () => {
       })
 
       if (response.data.success) {
+        // Find the renewed book details
+        const renewedBook = issuedBooks.find(book => book.ACCNO === selectedBookId);
+        
+        // Set renewed book details for the modal
+        setRenewedBookDetails({
+          ACCNO: renewedBook?.ACCNO || selectedBookId,
+          bookTitle: renewedBook?.bookTitle || renewedBook?.title || 'Unknown Title',
+          author: renewedBook?.author || 'Unknown Author',
+          publisher: renewedBook?.publisher || 'Unknown Publisher',
+          borrowerName: formData.borrowerType === 'student' ? formData.studentName : formData.firstName,
+          borrowerId: formData.borrowerType === 'student' ? formData.studentId : formData.employeeId,
+          borrowerType: formData.borrowerType,
+          department: formData.department,
+          course: formData.course,
+          semester: formData.semester,
+          designation: formData.designation,
+          email: formData.email,
+          phone: formData.phone,
+          oldDueDate: renewedBook?.dueDate || 'Unknown',
+          newDueDate: formData.newDueDate,
+          renewCount: (renewedBook?.renewCount || 0) + 1
+        });
+        
         setSuccess("Book renewed successfully!")
+        setShowRenewSuccessModal(true)
+        
+        // Only refresh issued books for the current borrower, not globally
         await fetchIssuedBooks(borrowerId, formData.borrowerType)
+        
+        // Clear form fields
         setSelectedBookId("")
         setFormData((prev) => ({
           ...prev,
           newDueDate: "",
         }))
+        
+        // 🔄 IMPORTANT: Notify parent components about the renewal
+        // This prevents cross-contamination between different students
+        // Dispatch event AFTER all processing is complete
+        setTimeout(() => {
+          if (window.dispatchEvent) {
+            window.dispatchEvent(new CustomEvent('bookRenewed', {
+              detail: {
+                borrowerId: borrowerId,
+                borrowerType: formData.borrowerType,
+                bookId: selectedBookId,
+                timestamp: new Date().toISOString()
+              }
+            }));
+            console.log(`🔄 Dispatched bookRenewed event for ${borrowerId} - Book ${selectedBookId}`);
+          }
+        }, 100); // Small delay to ensure all processing is complete
       } else {
         setError(response.data.message || "Failed to renew book")
       }
@@ -923,68 +1115,161 @@ const BookActions = () => {
   }
 
   const fetchIssuedBooks = async (borrowerId, borrowerType) => {
-    if (!borrowerId || !borrowerType) {
-      console.log("Missing borrowerId or borrowerType, skipping fetch");
+    // If no specific borrowerId provided, use the current form data
+    if (!borrowerId && !borrowerType) {
+      borrowerId = formData.borrowerType === "student" ? formData.studentId : formData.employeeId;
+      borrowerType = formData.borrowerType;
+    }
+    
+    if (!borrowerId || !borrowerType || !borrowerId.trim()) {
+      console.log("❌ Missing or invalid borrowerId/borrowerType, clearing issued books");
+      setIssuedBooks([]);
       return;
     }
     
     try {
-      console.log(`Fetching issued books for ${borrowerType} ${borrowerId}`);
+      console.log(`🔍 Fetching issued books for ${borrowerType} ${borrowerId}`);
       
-      let res;
-      try {
-        // Try first endpoint
-        res = await axios.get(`http://localhost:5000/api/issues/borrowed-books?borrowerId=${borrowerId}&borrowerType=${borrowerType}`);
-        console.log("Issued Books API response from issues/borrowed-books:", res.data);
-      } catch (endpointErr) {
-        // If first endpoint fails, try the second endpoint
-        console.log("First endpoint failed, trying alternative endpoint...");
-        res = await axios.get(`http://localhost:5000/api/borrowed-books?borrowerId=${borrowerId}&borrowerType=${borrowerType}`);
-        console.log("Issued Books API response from borrowed-books:", res.data);
-      }
+      // Clear existing books first
+      setIssuedBooks([]);
       
-      // Handle various response formats
+      // Make real API call to fetch borrowed books - include all statuses
+      const response = await axios.get(`http://localhost:5000/api/issues/borrowed-books`, {
+        params: {
+          borrowerId: borrowerId.trim(),
+          borrowerType: borrowerType,
+          includeRenewed: true, // Explicitly include renewed books
+          status: 'all' // Get all active books regardless of status
+        }
+      });
+
+      console.log(`📚 API Response for ${borrowerId}:`, response.data);
+
+      // Extract books from response - handle different response structures
       let books = [];
-      if (res.data.borrowedBooks) {
-        books = res.data.borrowedBooks;
-      } else if (res.data.data) {
-        books = Array.isArray(res.data.data) ? res.data.data : [res.data.data];
-      } else if (Array.isArray(res.data)) {
-        books = res.data;
+      if (response.data.success && response.data.data) {
+        books = Array.isArray(response.data.data) ? response.data.data : [];
+      } else if (response.data.borrowedBooks) {
+        books = Array.isArray(response.data.borrowedBooks) ? response.data.borrowedBooks : [];
+      } else if (Array.isArray(response.data)) {
+        books = response.data;
       }
+
+      // If we got fewer books than expected, try to get from history API as well
+      if (books.length < 2) {
+        console.log(`🔄 Only found ${books.length} books, checking history for more recent transactions...`);
+        try {
+          const historyParams = borrowerType === "student" 
+            ? { studentId: borrowerId, borrowerType: borrowerType, limit: 50 }
+            : { employeeId: borrowerId, borrowerType: borrowerType, limit: 50 };
+            
+          const historyResponse = await axios.get(`http://localhost:5000/api/issues/history`, {
+            params: historyParams
+          });
+
+          console.log(`🔍 History API called with params:`, historyParams);
+          console.log(`🔍 History API response for ${borrowerId}:`, historyResponse.data);
+
+          if (historyResponse.data.success && historyResponse.data.data.records) {
+            const allTransactions = historyResponse.data.data.records;
+            
+            // Group transactions by book ID to find the latest state of each book
+            const bookMap = new Map();
+            
+            // First add existing books to the map
+            books.forEach(book => {
+              const bookId = book.ACCNO || book.bookId;
+              bookMap.set(bookId, {
+                ...book,
+                source: 'borrowed-books'
+              });
+            });
+            
+            // Process all history transactions - but ONLY for the specific borrower
+            allTransactions.forEach(transaction => {
+              // 🔒 STRICT VALIDATION: Only include transactions for the exact borrower
+              const transactionBorrowerId = borrowerType === "student" 
+                ? transaction.studentId 
+                : transaction.employeeId;
+                
+              if (transactionBorrowerId !== borrowerId) {
+                console.log(`⚠️ Filtering out transaction for different borrower: ${transactionBorrowerId} (expected: ${borrowerId})`);
+                return; // Skip this transaction
+              }
+              
+              const bookId = transaction.bookId || transaction.ACCNO;
+              
+              // Only process if this transaction is more recent than what we have
+              if (!bookMap.has(bookId) || 
+                  new Date(transaction.createdAt) > new Date(bookMap.get(bookId).createdAt || 0)) {
+                bookMap.set(bookId, {
+                  ...transaction,
+                  ACCNO: bookId,
+                  bookTitle: transaction.bookTitle,
+                  author: transaction.author,
+                  publisher: transaction.publisher,
+                  source: 'history'
+                });
+              }
+            });
+            
+            // Filter to only include books that are currently active (not returned)
+            const activeBooks = [];
+            bookMap.forEach((latestTransaction, bookId) => {
+              if (latestTransaction.transactionType !== 'return' && latestTransaction.status === 'active') {
+                activeBooks.push(latestTransaction);
+              }
+            });
+            
+            console.log(`📚 Found ${activeBooks.length} total active books after deduplication`);
+            console.log(`📚 Books breakdown:`, activeBooks.map(book => ({
+              ACCNO: book.ACCNO,
+              title: book.bookTitle,
+              transactionType: book.transactionType,
+              source: book.source
+            })));
+            
+            books = activeBooks;
+          }
+        } catch (historyError) {
+          console.warn("Could not fetch from history:", historyError);
+        }
+      }
+
+      // Debug: Log book statuses and details
+      console.log(`📖 Found ${books.length} books for ${borrowerId}:`);
+      books.forEach((book, index) => {
+        console.log(`  Book ${index + 1}:`, {
+          ACCNO: book.ACCNO,
+          title: book.bookTitle,
+          status: book.status,
+          transactionType: book.transactionType,
+          isRenewed: book.isRenewed,
+          renewCount: book.renewCount,
+          issueDate: book.issueDate,
+          dueDate: book.dueDate,
+          currentDueDate: book.currentDueDate
+        });
+      });
+
+      console.log(`✅ Total issued books found for ${borrowerId}: ${books.length}`);
       
-      // Filter out any null or undefined entries
-      books = books.filter(book => book && book.ACCNO);
-      
-      console.log(`Found ${books.length} issued books:`, books);
-      
-      // Update state
+      // Update state with real borrowed books
       setIssuedBooks(books);
       
-      // Update history if books found
-      if (books.length > 0) {
-        setHistory(prev => {
-          const existingIds = new Set(prev.map(h => h.ACCNO));
-          const newBooks = books.filter(b => !existingIds.has(b.ACCNO));
-          return [...newBooks, ...prev];
-        });
-      }
-      
-      // Clear any previous errors if successful
+      // Clear any previous errors since this is expected behavior
       setError("");
       
     } catch (err) {
-      console.error("Error fetching issued books:", err);
-      
-      // Handle 404 (no books) as a non-error case
+      console.error("❌ Error checking issued books:", err);
+      // Only log 404 errors as info since no books issued is expected
       if (err.response?.status === 404) {
-        console.log("No active issues found - this is normal for new borrowers");
-        setIssuedBooks([]);
-        setError("");
+        console.log(`No books currently issued to ${borrowerType} ${borrowerId}`);
       } else {
-        setIssuedBooks([]);
-        setError(err.response?.data?.message || "Failed to fetch issued books. Please try again.");
+        console.error("Detailed error:", err.response?.data);
       }
+      setIssuedBooks([]);
+      setError("");
     }
   };
 
@@ -996,6 +1281,36 @@ const BookActions = () => {
       }
     });
   }, [students]);
+
+  // ✅ Auto-fetch books when borrower details change
+  useEffect(() => {
+    if (activeForm === "return" || activeForm === "renew") {
+      const borrowerId = formData.borrowerType === "student" ? formData.studentId : formData.employeeId;
+      
+      console.log(`🔄 useEffect triggered - borrowerType: ${formData.borrowerType}, borrowerId: ${borrowerId}, activeForm: ${activeForm}`);
+      
+      if (borrowerId && borrowerId.trim() && formData.borrowerType) {
+        console.log(`🔄 Auto-fetching books for ${formData.borrowerType} ${borrowerId}`);
+        fetchIssuedBooks(borrowerId.trim(), formData.borrowerType);
+      } else {
+        console.log(`🧹 Clearing books - no valid borrowerId`);
+        setIssuedBooks([]); // Clear books if no borrower selected
+        setSelectedBookId("");
+      }
+    }
+  }, [formData.borrowerType, formData.studentId, formData.employeeId, activeForm]);
+
+  // ✅ Auto-sync history filters with current borrower selection
+  useEffect(() => {
+    if (activeForm === "history") {
+      setFilters(prev => ({
+        ...prev,
+        borrowerType: formData.borrowerType,
+        studentId: formData.borrowerType === "student" ? formData.studentId : "",
+        employeeId: formData.borrowerType === "faculty" ? formData.employeeId : ""
+      }));
+    }
+  }, [formData.borrowerType, formData.studentId, formData.employeeId, activeForm]);
 
   const fetchHistory = async () => {
     try {
@@ -1011,20 +1326,25 @@ const BookActions = () => {
         params.append("bookId", filters.ACCNO)
       }
 
-      if (filters.borrowerType === "student" && filters.studentId) {
-        params.append("studentId", filters.studentId)
-      } else if (filters.borrowerType === "faculty" && filters.employeeId) {
-        params.append("employeeId", filters.employeeId)
-      }
-
-      if (filters.borrowerType && filters.borrowerType !== "all") {
-        params.append("borrowerType", filters.borrowerType)
+      // Auto-apply borrower type filter based on current form selection
+      const currentBorrowerType = filters.borrowerType !== "all" ? filters.borrowerType : formData.borrowerType;
+      
+      if (currentBorrowerType === "student" && (filters.studentId || formData.studentId)) {
+        params.append("studentId", filters.studentId || formData.studentId)
+        params.append("borrowerType", "student")
+      } else if (currentBorrowerType === "faculty" && (filters.employeeId || formData.employeeId)) {
+        params.append("employeeId", filters.employeeId || formData.employeeId)
+        params.append("borrowerType", "faculty")
+      } else if (currentBorrowerType && currentBorrowerType !== "all") {
+        params.append("borrowerType", currentBorrowerType)
       }
 
       if (filters.transactionType !== "all") {
         params.append("transactionType", filters.transactionType)
       }
 
+      console.log("📊 History API params:", params.toString());
+      
       const response = await axios.get(`http://localhost:5000/api/issues/history?${params}`)
       console.log("Backend history response:", response.data)
 
@@ -1091,16 +1411,26 @@ const BookActions = () => {
   const handleInputChange = async (e) => {
     const { name, value } = e.target
 
+    console.log(`🔧 handleInputChange called: ${name} = ${value}, activeForm = ${activeForm}`);
+
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }))
+
+    // Clear issued books immediately when changing borrower IDs
+    if (name === "studentId" || name === "employeeId") {
+      console.log(`🧹 Clearing issued books due to ${name} change`);
+      setIssuedBooks([]);
+      setSelectedBookId("");
+    }
 
     if (name === "ACCNO" && value.length > 0) {
       fetchBookDetails(value)
     }
 
     if (name === "studentId" && value.length > 0) {
+      console.log(`🎓 Processing studentId change: ${value}`);
       try {
         setLoading(true)
         setError("")
@@ -1137,7 +1467,10 @@ const BookActions = () => {
           }))
 
           if (studentData.studentId) {
-            fetchIssuedBooks(studentData.studentId, "student")
+            // Only fetch issued books for Issue, Return, and Renew forms, not for Lost Book form
+            if (activeForm !== "lost") {
+              fetchIssuedBooks(studentData.studentId, "student")
+            }
           }
         }
       } catch (err) {
@@ -1164,6 +1497,7 @@ const BookActions = () => {
     }
 
     if (name === "employeeId" && value.length > 0) {
+      console.log(`👨‍🏫 Processing employeeId change: ${value}, activeForm: ${activeForm}`);
       try {
         setLoading(true)
         setError("")
@@ -1211,7 +1545,10 @@ const BookActions = () => {
           }))
 
           if (facultyMember.employeeId || facultyMember.empId || facultyMember.id) {
-            fetchIssuedBooks(employeeId, "faculty")
+            // Only fetch issued books for Issue, Return, and Renew forms, not for Lost Book form
+            if (activeForm !== "lost") {
+              fetchIssuedBooks(employeeId, "faculty")
+            }
           }
 
           setError("")
@@ -1256,21 +1593,157 @@ const BookActions = () => {
   const handleReturnSubmit = async () => {
     const borrowerId = formData.borrowerType === "student" ? formData.studentId : formData.employeeId
 
+    console.log("Return submit - borrowerId:", borrowerId, "borrowerType:", formData.borrowerType);
+    console.log("Current issuedBooks state:", issuedBooks);
+    console.log("Selected book ID:", selectedBookId);
+
     if (!borrowerId || !selectedBookId) {
       setError(`${formData.borrowerType === "student" ? "Student ID" : "Employee ID"} and Book selection are required`)
       return
     }
 
+    // Always fetch fresh issued books data before proceeding
+    console.log("Fetching fresh issued books data...");
+    try {
+      setLoading(true);
+      
+      // Fetch issued books first - include all statuses and renewed books
+      const response = await axios.get(`http://localhost:5000/api/issues/borrowed-books`, {
+        params: {
+          borrowerId: borrowerId,
+          borrowerType: formData.borrowerType,
+          includeRenewed: true, // Explicitly include renewed books
+          status: 'all' // Get all active books regardless of status
+        }
+      });
+
+      console.log("🔄 Fresh issued books response:", response.data);
+
+      // Extract books from response
+      let currentIssuedBooks = [];
+      if (response.data.success && response.data.data) {
+        currentIssuedBooks = Array.isArray(response.data.data) ? response.data.data : [];
+      } else if (response.data.borrowedBooks) {
+        currentIssuedBooks = Array.isArray(response.data.borrowedBooks) ? response.data.borrowedBooks : [];
+      } else if (Array.isArray(response.data)) {
+        currentIssuedBooks = response.data;
+      }
+
+      // If we got fewer books than expected, try to get from history API as well
+      if (currentIssuedBooks.length < 2) {
+        console.log(`🔄 Only found ${currentIssuedBooks.length} books, checking history for more recent transactions...`);
+        try {
+          const historyParams = borrowerType === "student" 
+            ? { studentId: borrowerId, borrowerType: borrowerType, limit: 50 }
+            : { employeeId: borrowerId, borrowerType: borrowerType, limit: 50 };
+            
+          const historyResponse = await axios.get(`http://localhost:5000/api/issues/history`, {
+            params: historyParams
+          });
+
+          console.log(`🔍 History API called with params:`, historyParams);
+          console.log(`🔍 History API response for ${borrowerId}:`, historyResponse.data);
+
+          if (historyResponse.data.success && historyResponse.data.data.records) {
+            const allTransactions = historyResponse.data.data.records;
+            
+            // Group transactions by book ID to find the latest state of each book
+            const bookMap = new Map();
+            
+            // First add existing books to the map
+            currentIssuedBooks.forEach(book => {
+              const bookId = book.ACCNO || book.bookId;
+              bookMap.set(bookId, {
+                ...book,
+                source: 'borrowed-books'
+              });
+            });
+            
+            // Process all history transactions - but ONLY for the specific borrower
+            allTransactions.forEach(transaction => {
+              // 🔒 STRICT VALIDATION: Only include transactions for the exact borrower
+              const transactionBorrowerId = formData.borrowerType === "student" 
+                ? transaction.studentId 
+                : transaction.employeeId;
+                
+              if (transactionBorrowerId !== borrowerId) {
+                console.log(`⚠️ Filtering out transaction for different borrower: ${transactionBorrowerId} (expected: ${borrowerId})`);
+                return; // Skip this transaction
+              }
+              
+              const bookId = transaction.bookId || transaction.ACCNO;
+              
+              // Only process if this transaction is more recent than what we have
+              if (!bookMap.has(bookId) || 
+                  new Date(transaction.createdAt) > new Date(bookMap.get(bookId).createdAt || 0)) {
+                bookMap.set(bookId, {
+                  ...transaction,
+                  ACCNO: bookId,
+                  bookTitle: transaction.bookTitle,
+                  author: transaction.author,
+                  publisher: transaction.publisher,
+                  source: 'history'
+                });
+              }
+            });
+            
+            // Filter to only include books that are currently active (not returned)
+            const activeBooks = [];
+            bookMap.forEach((latestTransaction, bookId) => {
+              if (latestTransaction.transactionType !== 'return' && latestTransaction.status === 'active') {
+                activeBooks.push(latestTransaction);
+              }
+            });
+            
+            console.log(`📚 Found ${activeBooks.length} total active books after deduplication in return`);
+            
+            currentIssuedBooks = activeBooks;
+          }
+        } catch (historyError) {
+          console.warn("Could not fetch from history:", historyError);
+        }
+      }
+
+      console.log("Current issued books found:", currentIssuedBooks);
+
+      // Update the state with fresh data
+      setIssuedBooks(currentIssuedBooks);
+
+      // Check if there are any issued books
+      if (!currentIssuedBooks || currentIssuedBooks.length === 0) {
+        setError("No active books found for this borrower. Please check the ID or ensure books are issued.");
+        setLoading(false);
+        return;
+      }
+
+      // Check if the selected book exists in the issued books list
+      const selectedBook = currentIssuedBooks.find(book => book.ACCNO === selectedBookId);
+      if (!selectedBook) {
+        setError("Selected book is not currently issued to this borrower.");
+        setLoading(false);
+        return;
+      }
+
+      console.log("Selected book found:", selectedBook);
+
+    } catch (fetchError) {
+      console.error("Error fetching issued books:", fetchError);
+      setError("Error fetching issued books. Please check the ID or ensure books are issued.");
+      setLoading(false);
+      return;
+    }
+
+    // Now proceed with the return process using fresh data
     try {
       setError("")
       setSuccess("")
-      setLoading(true)
+      // setLoading(true) - already set above
       
-      // Check if the selected book exists in the issued books list
-      const isBookIssued = issuedBooks.some(book => book.ACCNO === selectedBookId);
+      // Get the fresh issued books data (already fetched above)
+      const currentIssuedBooks = issuedBooks; // Use the updated state
       
-      if (!isBookIssued && issuedBooks.length > 0) {
-        console.warn("Selected book not found in issued books list");
+      if (!currentIssuedBooks.length > 0) {
+        console.warn("No issued books found after fresh fetch");
       }
 
       // Create comprehensive return data with all possible field names
@@ -1298,7 +1771,7 @@ const BookActions = () => {
         console.log("Return endpoint failed:", endpointErr.message);
         
         // If there's an error, let's check if the book exists in the issued books array
-        const matchingBook = issuedBooks.find(book => book.ACCNO === selectedBookId);
+        const matchingBook = currentIssuedBooks.find(book => book.ACCNO === selectedBookId);
         
         if (matchingBook) {
           console.log("Found matching book in issued books:", matchingBook);
@@ -1318,6 +1791,10 @@ const BookActions = () => {
       const { success, message, data } = res.data
 
       if (success) {
+        // Get book details for the modal using fresh data
+        const returnedBook = currentIssuedBooks.find(book => book.ACCNO === selectedBookId);
+        
+        let fineAmount = 0;
         if (data.fineAmount > 0 && data.fineStatus === "pending") {
           const confirmReturn = window.confirm(
             `Fine of Rs. ${data.fineAmount} is due. Has the student paid the fine? Click OK to confirm and complete return.`,
@@ -1348,9 +1825,47 @@ const BookActions = () => {
             console.warn("Book return succeeded but fine payment recording failed");
           }
 
-          setSuccess(`Book returned and fine of Rs. ${data.fineAmount} marked as paid.`)
-        } else {
-          setSuccess(message || "Book returned successfully.")
+          fineAmount = data.fineAmount;
+        }
+
+        // Calculate days borrowed
+        const issueDate = new Date(returnedBook?.issueDate || new Date());
+        const returnDate = new Date(formData.returnDate || new Date());
+        const daysBorrowed = Math.ceil((returnDate - issueDate) / (1000 * 60 * 60 * 24));
+
+        // Prepare return book details for modal
+        const returnBookDetails = {
+          ACCNO: selectedBookId,
+          bookTitle: returnedBook?.bookTitle || "Unknown Title",
+          author: returnedBook?.author || "Unknown Author",
+          publisher: returnedBook?.publisher || "Unknown Publisher",
+          borrowerName: returnedBook?.borrowerName || formData.borrowerName || "Unknown",
+          borrowerId: borrowerId,
+          borrowerType: formData.borrowerType,
+          department: returnedBook?.department || formData.department || "Unknown",
+          course: returnedBook?.course || formData.course,
+          semester: returnedBook?.semester || formData.semester,
+          designation: returnedBook?.designation || formData.designation,
+          issueDate: returnedBook?.issueDate ? new Date(returnedBook.issueDate).toLocaleDateString() : "Unknown",
+          returnDate: new Date(formData.returnDate || new Date()).toLocaleDateString(),
+          daysBorrowed: daysBorrowed,
+          fineAmount: fineAmount
+        };
+
+        setReturnBookDetails(returnBookDetails);
+        setShowReturnModal(true);
+
+        // 🔄 IMPORTANT: Notify parent components about the book return
+        // This prevents cross-contamination and ensures accurate book counts
+        if (window.dispatchEvent) {
+          window.dispatchEvent(new CustomEvent('bookReturned', {
+            detail: {
+              borrowerId: borrowerId,
+              borrowerType: formData.borrowerType,
+              bookId: selectedBookId,
+              timestamp: new Date().toISOString()
+            }
+          }));
         }
 
         setFormData((prev) => ({
@@ -1679,35 +2194,35 @@ const BookActions = () => {
         <button
           type="button"
           className={`px-4 py-2 rounded font-semibold ${activeForm === "issue" ? "bg-blue-600 text-white" : "bg-gray-200"}`}
-          onClick={() => setActiveForm("issue")}
+          onClick={() => handleTabChange("issue")}
         >
           Issue Book
         </button>
         <button
           type="button"
           className={`px-4 py-2 rounded font-semibold ${activeForm === "return" ? "bg-blue-600 text-white" : "bg-gray-200"}`}
-          onClick={() => setActiveForm("return")}
+          onClick={() => handleTabChange("return")}
         >
           Return Book
         </button>
         <button
           type="button"
           className={`px-4 py-2 rounded font-semibold ${activeForm === "renew" ? "bg-blue-600 text-white" : "bg-gray-200"}`}
-          onClick={() => setActiveForm("renew")}
+          onClick={() => handleTabChange("renew")}
         >
           Renew Book
         </button>
         <button
           type="button"
           className={`px-4 py-2 rounded font-semibold ${activeForm === "lost" ? "bg-blue-600 text-white" : "bg-gray-200"}`}
-          onClick={() => setActiveForm("lost")}
+          onClick={() => handleTabChange("lost")}
         >
           Lost Book Entry
         </button>
         <button
           type="button"
           className={`px-4 py-2 rounded font-semibold ${activeForm === "history" ? "bg-blue-600 text-white" : "bg-gray-200"}`}
-          onClick={() => setActiveForm("history")}
+          onClick={() => handleTabChange("history")}
         >
           History
         </button>
@@ -2443,6 +2958,143 @@ const BookActions = () => {
             </div>
 
             <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-4">Borrower Information</h3>
+              <div className="mb-4">
+                <label className="block text-lg font-semibold mb-2">Select Borrower Type</label>
+                <div className="flex space-x-4">
+                  <label className="inline-flex items-center">
+                    <input
+                      type="radio"
+                      name="borrowerType"
+                      value="student"
+                      checked={formData.borrowerType === "student"}
+                      onChange={handleInputChange}
+                      className="mr-2"
+                    />
+                    Student
+                  </label>
+                  <label className="inline-flex items-center">
+                    <input
+                      type="radio"
+                      name="borrowerType"
+                      value="faculty"
+                      checked={formData.borrowerType === "faculty"}
+                      onChange={handleInputChange}
+                      className="mr-2"
+                    />
+                    Faculty
+                  </label>
+                </div>
+              </div>
+
+              {formData.borrowerType === "student" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Student ID</label>
+                    <input
+                      type="text"
+                      name="studentId"
+                      value={formData.studentId}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border rounded"
+                      placeholder="Enter Student ID"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Student Name</label>
+                    <input
+                      type="text"
+                      name="studentName"
+                      value={formData.studentName}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border rounded"
+                      placeholder="Student name will be auto-filled"
+                      readOnly
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Department</label>
+                    <input
+                      type="text"
+                      name="department"
+                      value={formData.department}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border rounded"
+                      placeholder="Department will be auto-filled"
+                      readOnly
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Course</label>
+                    <input
+                      type="text"
+                      name="course"
+                      value={formData.course}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border rounded"
+                      placeholder="Course will be auto-filled"
+                      readOnly
+                    />
+                  </div>
+                </div>
+              )}
+
+              {formData.borrowerType === "faculty" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Employee ID</label>
+                    <input
+                      type="text"
+                      name="employeeId"
+                      value={formData.employeeId}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border rounded"
+                      placeholder="Enter Employee ID"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Faculty Name</label>
+                    <input
+                      type="text"
+                      name="firstName"
+                      value={formData.firstName}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border rounded"
+                      placeholder="Faculty name will be auto-filled"
+                      readOnly
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Department</label>
+                    <input
+                      type="text"
+                      name="department"
+                      value={formData.department}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border rounded"
+                      placeholder="Department will be auto-filled"
+                      readOnly
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Designation</label>
+                    <input
+                      type="text"
+                      name="designation"
+                      value={formData.designation}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border rounded"
+                      placeholder="Designation will be auto-filled"
+                      readOnly
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mb-6">
               <h3 className="text-lg font-semibold mb-4">Lost Book Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -2704,6 +3356,255 @@ const BookActions = () => {
           {!loading && history.length === 0 && (
             <div className="text-center p-8 text-gray-500">{error || "No transaction history found"}</div>
           )}
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && issuedBookDetails && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 transform animate-pulse">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-green-600 mb-2">Book Issued Successfully!</h3>
+              <p className="text-gray-600">The book has been successfully issued to the borrower.</p>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-800 mb-2">Book Details</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div><span className="font-medium">ACCNO:</span> {issuedBookDetails.ACCNO}</div>
+                  <div><span className="font-medium">Title:</span> {issuedBookDetails.bookTitle}</div>
+                  <div><span className="font-medium">Author:</span> {issuedBookDetails.author}</div>
+                  <div><span className="font-medium">Publisher:</span> {issuedBookDetails.publisher}</div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-800 mb-2">Borrower Details</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div><span className="font-medium">Name:</span> {issuedBookDetails.borrowerName}</div>
+                  <div><span className="font-medium">ID:</span> {issuedBookDetails.borrowerId}</div>
+                  <div><span className="font-medium">Type:</span> {issuedBookDetails.borrowerType}</div>
+                  <div><span className="font-medium">Department:</span> {issuedBookDetails.department}</div>
+                  {issuedBookDetails.borrowerType === 'student' && (
+                    <>
+                      <div><span className="font-medium">Course:</span> {issuedBookDetails.course}</div>
+                      <div><span className="font-medium">Semester:</span> {issuedBookDetails.semester}</div>
+                    </>
+                  )}
+                  {issuedBookDetails.borrowerType === 'faculty' && (
+                    <div><span className="font-medium">Designation:</span> {issuedBookDetails.designation}</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-800 mb-2">Issue Information</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div><span className="font-medium">Issue Date:</span> {issuedBookDetails.issueDate}</div>
+                  <div><span className="font-medium">Due Date:</span> {issuedBookDetails.dueDate}</div>
+                  <div><span className="font-medium">Email:</span> {issuedBookDetails.email}</div>
+                  <div><span className="font-medium">Phone:</span> {issuedBookDetails.phone}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowSuccessModal(false)
+                  setIssuedBookDetails(null)
+                }}
+                className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  window.print()
+                }}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                </svg>
+                Print Receipt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Return Success Modal */}
+      {showReturnModal && returnBookDetails && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 transform animate-pulse">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-blue-600 mb-2">Book Returned Successfully!</h3>
+              <p className="text-gray-600">The book has been successfully returned by the borrower.</p>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-800 mb-2">Book Details</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div><span className="font-medium">ACCNO:</span> {returnBookDetails.ACCNO}</div>
+                  <div><span className="font-medium">Title:</span> {returnBookDetails.bookTitle}</div>
+                  <div><span className="font-medium">Author:</span> {returnBookDetails.author}</div>
+                  <div><span className="font-medium">Publisher:</span> {returnBookDetails.publisher}</div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-800 mb-2">Borrower Details</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div><span className="font-medium">Name:</span> {returnBookDetails.borrowerName}</div>
+                  <div><span className="font-medium">ID:</span> {returnBookDetails.borrowerId}</div>
+                  <div><span className="font-medium">Type:</span> {returnBookDetails.borrowerType}</div>
+                  <div><span className="font-medium">Department:</span> {returnBookDetails.department}</div>
+                  {returnBookDetails.borrowerType === 'student' && (
+                    <>
+                      <div><span className="font-medium">Course:</span> {returnBookDetails.course}</div>
+                      <div><span className="font-medium">Semester:</span> {returnBookDetails.semester}</div>
+                    </>
+                  )}
+                  {returnBookDetails.borrowerType === 'faculty' && (
+                    <div><span className="font-medium">Designation:</span> {returnBookDetails.designation}</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-green-50 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-800 mb-2">Return Information</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div><span className="font-medium">Issue Date:</span> {returnBookDetails.issueDate}</div>
+                  <div><span className="font-medium">Return Date:</span> {returnBookDetails.returnDate}</div>
+                  <div><span className="font-medium">Days Borrowed:</span> {returnBookDetails.daysBorrowed}</div>
+                  {returnBookDetails.fineAmount > 0 && (
+                    <div><span className="font-medium text-red-600">Fine Amount:</span> ₹{returnBookDetails.fineAmount}</div>
+                  )}
+                  {returnBookDetails.fineAmount === 0 && (
+                    <div><span className="font-medium text-green-600">Status:</span> No Fine</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowReturnModal(false)
+                  setReturnBookDetails(null)
+                }}
+                className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  window.print()
+                }}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                </svg>
+                Print Receipt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Renewal Success Modal */}
+      {showRenewSuccessModal && renewedBookDetails && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 transform animate-pulse">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-green-600 mb-2">Book Renewed Successfully!</h3>
+              <p className="text-gray-600">The book has been successfully renewed with a new due date.</p>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-800 mb-2">Book Details</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div><span className="font-medium">ACCNO:</span> {renewedBookDetails.ACCNO}</div>
+                  <div><span className="font-medium">Title:</span> {renewedBookDetails.bookTitle}</div>
+                  <div><span className="font-medium">Author:</span> {renewedBookDetails.author}</div>
+                  <div><span className="font-medium">Publisher:</span> {renewedBookDetails.publisher}</div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-800 mb-2">Borrower Details</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div><span className="font-medium">Name:</span> {renewedBookDetails.borrowerName}</div>
+                  <div><span className="font-medium">ID:</span> {renewedBookDetails.borrowerId}</div>
+                  <div><span className="font-medium">Type:</span> {renewedBookDetails.borrowerType}</div>
+                  <div><span className="font-medium">Department:</span> {renewedBookDetails.department}</div>
+                  {renewedBookDetails.borrowerType === 'student' && (
+                    <>
+                      <div><span className="font-medium">Course:</span> {renewedBookDetails.course}</div>
+                      <div><span className="font-medium">Semester:</span> {renewedBookDetails.semester}</div>
+                    </>
+                  )}
+                  {renewedBookDetails.borrowerType === 'faculty' && (
+                    <div><span className="font-medium">Designation:</span> {renewedBookDetails.designation}</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-800 mb-2">Renewal Information</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div><span className="font-medium">Previous Due Date:</span> {renewedBookDetails.oldDueDate}</div>
+                  <div><span className="font-medium">New Due Date:</span> {renewedBookDetails.newDueDate}</div>
+                  <div><span className="font-medium">Total Renewals:</span> {renewedBookDetails.renewCount}</div>
+                  <div><span className="font-medium">Email:</span> {renewedBookDetails.email}</div>
+                  <div><span className="font-medium">Phone:</span> {renewedBookDetails.phone}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowRenewSuccessModal(false)
+                  setRenewedBookDetails(null)
+                }}
+                className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  window.print()
+                }}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                </svg>
+                Print Receipt
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
