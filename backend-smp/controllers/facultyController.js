@@ -5,6 +5,7 @@ import AdminSubject from "../models/AdminSubject.js";
 import Attendance from "../models/attendance.js";
 import SalaryRecord from "../models/SalaryRecord.js";
 import Counter from "../models/Counter.js";
+import Scholarship from "../models/Scholarship.js";
 import bcrypt from "bcryptjs";
 import emailvalidator from "email-validator";
 import mongoose from "mongoose";
@@ -526,9 +527,37 @@ const getFaculties = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const filter = {};
+
+    // Handle department filtering with ObjectId lookup
     if (department) {
-      filter.department = department;
+      try {
+        // First, find the department ObjectId in AcademicDepartment collection
+        const academicDepartment = await Department.findOne({
+          name: { $regex: new RegExp(department, "i") },
+        });
+
+        if (academicDepartment) {
+          filter.department = academicDepartment._id;
+        } else {
+          // If no matching department found, return empty result
+          return res.status(200).json({
+            success: true,
+            message: `No faculty found for department "${department}"`,
+            data: {
+              faculties: [],
+              pagination: { page, limit, total: 0, pages: 0 },
+            },
+          });
+        }
+      } catch (deptError) {
+        console.error("Error finding department:", deptError);
+        return res.status(400).json({
+          success: false,
+          message: "Error processing department filter",
+        });
+      }
     }
+
     if (facultyId) {
       filter._id = facultyId;
     }
@@ -536,8 +565,8 @@ const getFaculties = async (req, res) => {
       filter.type = type;
     }
     // Filter for teaching faculty only (excludes non-teaching staff)
-    if (teachingOnly === 'true') {
-      filter.type = { $in: ['teaching', 'HOD', 'principal', 'cc'] };
+    if (teachingOnly === "true") {
+      filter.type = { $in: ["teaching", "HOD", "principal", "cc"] };
     }
 
     let faculties;
@@ -546,7 +575,7 @@ const getFaculties = async (req, res) => {
       faculties = await Faculty.find(filter)
         .populate({
           path: "subjectsTaught",
-          model: "AdminSubject"
+          model: "AdminSubject",
         })
         .skip(skip)
         .limit(limit)
@@ -554,10 +583,7 @@ const getFaculties = async (req, res) => {
     } catch (err) {
       // If population fails due to bad data, try again without population
       populationError = err.message;
-      faculties = await Faculty.find(filter)
-        .skip(skip)
-        .limit(limit)
-        .lean();
+      faculties = await Faculty.find(filter).skip(skip).limit(limit).lean();
     }
 
     // Always return 200 with empty array if no faculty found
@@ -574,7 +600,9 @@ const getFaculties = async (req, res) => {
             pages: 0,
           },
         },
-        warning: populationError ? `Population error: ${populationError}` : undefined,
+        warning: populationError
+          ? `Population error: ${populationError}`
+          : undefined,
       });
     }
 
@@ -592,7 +620,9 @@ const getFaculties = async (req, res) => {
           pages: Math.ceil(total / limit),
         },
       },
-      warning: populationError ? `Population error: ${populationError}` : undefined,
+      warning: populationError
+        ? `Population error: ${populationError}`
+        : undefined,
     });
   } catch (error) {
     console.error("Get Faculties Error:", error);
@@ -681,67 +711,89 @@ const getLastEmployeeId = async (req, res) => {
 const assignCC = async (req, res) => {
   try {
     console.log("[AssignCC] Request body:", req.body);
-    
-    let { facultyId, academicYear, semester, section, department, updateType } = req.body;
+
+    let { facultyId, academicYear, semester, section, department, updateType } =
+      req.body;
     if (!facultyId || !academicYear || !semester || !section || !department) {
       return res.status(400).json({
         success: false,
-        message: "facultyId, academicYear, semester, section, and department are required",
+        message:
+          "facultyId, academicYear, semester, section, and department are required",
       });
     }
 
     // Department name corrections for common typos
     const departmentCorrections = {
-      'eletronic enigneering': 'Electronics Engineering',
-      'eletronic engineering': 'Electronics Engineering',
-      'electronic enigneering': 'Electronics Engineering',
-      'electronic engineering': 'Electronics Engineering',
-      'electronics': 'Electronics Engineering',
-      'computer scince': 'Computer Science Engineering',
-      'computer science': 'Computer Science Engineering',
-      'civil enigneering': 'Civil Engineering',
-      'civil': 'Civil Engineering',
-      'mechanical enigneering': 'Mechanical Engineering',
-      'mechanical': 'Mechanical Engineering',
-      'electrical enigneering': 'Electrical Engineering',
-      'electrical': 'Electrical Engineering',
-      'information tecnology': 'Information Technology',
-      'data scince': 'Data Science',
-      'account': 'Account Section'
+      "eletronic enigneering": "Electronics Engineering",
+      "eletronic engineering": "Electronics Engineering",
+      "electronic enigneering": "Electronics Engineering",
+      "electronic engineering": "Electronics Engineering",
+      electronics: "Electronics Engineering",
+      "computer scince": "Computer Science Engineering",
+      "computer science": "Computer Science Engineering",
+      "civil enigneering": "Civil Engineering",
+      civil: "Civil Engineering",
+      "mechanical enigneering": "Mechanical Engineering",
+      mechanical: "Mechanical Engineering",
+      "electrical enigneering": "Electrical Engineering",
+      electrical: "Electrical Engineering",
+      "information tecnology": "Information Technology",
+      "data scince": "Data Science",
+      account: "Account Section",
     };
 
     // Apply corrections if found
     const originalDepartment = department;
     const lowerDept = department.toLowerCase();
     let correctedDepartment = department; // This is the corrected department name
-    
+
     if (departmentCorrections[lowerDept]) {
       correctedDepartment = departmentCorrections[lowerDept];
-      console.log(`[AssignCC] Department corrected from "${originalDepartment}" to "${correctedDepartment}"`);
+      console.log(
+        `[AssignCC] Department corrected from "${originalDepartment}" to "${correctedDepartment}"`
+      );
     }
-    
-    console.log("[AssignCC] Using department for assignment:", correctedDepartment);
+
+    console.log(
+      "[AssignCC] Using department for assignment:",
+      correctedDepartment
+    );
     console.log("[AssignCC] Looking up faculty with ID:", facultyId);
 
     const faculty = await Faculty.findById(facultyId);
-    console.log("[AssignCC] Found faculty:", faculty ? `${faculty.firstName} ${faculty.lastName}` : "Not found");
-    
+    console.log(
+      "[AssignCC] Found faculty:",
+      faculty ? `${faculty.firstName} ${faculty.lastName}` : "Not found"
+    );
+
     if (!faculty) {
-      return res.status(404).json({ success: false, message: "Faculty not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Faculty not found" });
     }
 
     // Check if faculty department matches any variation of the requested department
     const facultyDept = faculty.department?.toLowerCase();
     const requestDeptLower = originalDepartment.toLowerCase();
     const correctedDeptLower = correctedDepartment.toLowerCase();
-    
-    const departmentMatches = facultyDept === requestDeptLower || 
-                            facultyDept === correctedDeptLower ||
-                            facultyDept.includes('electronic') && (requestDeptLower.includes('electronic') || correctedDeptLower.includes('electronic'));
-    
-    console.log("[AssignCC] Faculty dept:", facultyDept, "Request dept:", requestDeptLower, "Corrected dept:", correctedDeptLower);
+
+    const departmentMatches =
+      facultyDept === requestDeptLower ||
+      facultyDept === correctedDeptLower ||
+      (facultyDept.includes("electronic") &&
+        (requestDeptLower.includes("electronic") ||
+          correctedDeptLower.includes("electronic")));
+
+    console.log(
+      "[AssignCC] Faculty dept:",
+      facultyDept,
+      "Request dept:",
+      requestDeptLower,
+      "Corrected dept:",
+      correctedDeptLower
+    );
     console.log("[AssignCC] Department match result:", departmentMatches);
-    
+
     if (!departmentMatches) {
       console.log("[AssignCC] Department mismatch - returning error");
       return res.status(400).json({
@@ -754,18 +806,19 @@ const assignCC = async (req, res) => {
     if (faculty.type !== "teaching" && faculty.type !== "cc") {
       return res.status(400).json({
         success: false,
-        message: "Only teaching faculty or existing Course Coordinators can be assigned as Course Coordinator",
+        message:
+          "Only teaching faculty or existing Course Coordinators can be assigned as Course Coordinator",
       });
     }
 
     // NOTE: Faculty's department should NOT be changed during CC assignment
     // We will use the original faculty department for validation and assignments
-    
+
     console.log("[AssignCC] Looking for previous CC...");
-    
+
     // Use corrected department names for database queries
     const searchDepartment = faculty.department; // Use faculty's actual department for searching
-    
+
     // Find the previous CC for this slot and set their type back to 'teaching' if needed
     const previousCC = await Faculty.findOne({
       department: searchDepartment,
@@ -775,8 +828,11 @@ const assignCC = async (req, res) => {
       _id: { $ne: facultyId },
       type: "cc",
     });
-    console.log("[AssignCC] Previous CC found:", previousCC ? `${previousCC.firstName} ${previousCC.lastName}` : "None");
-    
+    console.log(
+      "[AssignCC] Previous CC found:",
+      previousCC ? `${previousCC.firstName} ${previousCC.lastName}` : "None"
+    );
+
     if (previousCC) {
       previousCC.type = "teaching";
       await previousCC.save();
@@ -789,7 +845,7 @@ const assignCC = async (req, res) => {
         $or: [
           { department: correctedDepartment },
           { department: faculty.department },
-          { department: originalDepartment }
+          { department: originalDepartment },
         ],
         ccAssignments: { $elemMatch: { academicYear, semester, section } },
       },
@@ -798,34 +854,36 @@ const assignCC = async (req, res) => {
 
     console.log("[AssignCC] Filtering current faculty's CC assignments...");
     console.log("[AssignCC] Current ccAssignments:", faculty.ccAssignments);
-    
+
     // Ensure ccAssignments is an array
     if (!Array.isArray(faculty.ccAssignments)) {
       faculty.ccAssignments = [];
       console.log("[AssignCC] Initialized ccAssignments array");
     }
 
-    faculty.ccAssignments = faculty.ccAssignments.filter(
-      (cc) => {
-        const ccDeptMatches = cc.academicYear === academicYear &&
-          cc.semester === semester &&
-          cc.section === section &&
-          (cc.department === correctedDepartment || 
-           cc.department === faculty.department ||
-           cc.department === originalDepartment ||
-           cc.department?.toLowerCase() === originalDepartment.toLowerCase());
-        
-        return !ccDeptMatches;
-      }
-    );
+    faculty.ccAssignments = faculty.ccAssignments.filter((cc) => {
+      const ccDeptMatches =
+        cc.academicYear === academicYear &&
+        cc.semester === semester &&
+        cc.section === section &&
+        (cc.department === correctedDepartment ||
+          cc.department === faculty.department ||
+          cc.department === originalDepartment ||
+          cc.department?.toLowerCase() === originalDepartment.toLowerCase());
+
+      return !ccDeptMatches;
+    });
 
     console.log("[AssignCC] Adding new CC assignment...");
-    
+
     // Use the faculty's original department for the assignment (do not modify faculty's department)
     const assignmentDepartment = faculty.department; // Use faculty's actual department
-    
-    console.log("[AssignCC] Using faculty's original department for assignment:", assignmentDepartment);
-    
+
+    console.log(
+      "[AssignCC] Using faculty's original department for assignment:",
+      assignmentDepartment
+    );
+
     faculty.ccAssignments.push({
       academicYear,
       semester,
@@ -845,7 +903,9 @@ const assignCC = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: `${faculty.firstName} ${faculty.lastName || ""} assigned as Course Coordinator for ${academicYear}, Semester ${semester}, Section ${section}`,
+      message: `${faculty.firstName} ${
+        faculty.lastName || ""
+      } assigned as Course Coordinator for ${academicYear}, Semester ${semester}, Section ${section}`,
       data: {
         facultyId: faculty._id,
         name: `${faculty.firstName} ${faculty.lastName || ""}`.trim(),
@@ -886,71 +946,100 @@ const getCCAssignments = async (req, res) => {
     // Approach 1: Get all faculties and filter with JavaScript (this was working)
     try {
       console.log("[GetCCAssignments] Trying JavaScript filtering approach...");
-      
+
       // First try to get faculties without population to avoid ObjectId casting errors
       const allFaculties = await Faculty.find({
         ccAssignments: { $exists: true, $ne: [] },
       })
         .select("firstName lastName ccAssignments department")
         .lean();
-      
-      console.log("[GetCCAssignments] Total faculties with CC assignments:", allFaculties.length);
-      
+
+      console.log(
+        "[GetCCAssignments] Total faculties with CC assignments:",
+        allFaculties.length
+      );
+
       // Filter faculties by department name (case insensitive partial match)
-      faculties = allFaculties.filter(faculty => {
+      faculties = allFaculties.filter((faculty) => {
         const searchDept = department.toLowerCase();
-        
+
         // Handle both string department and ObjectId department
-        let deptName = '';
-        if (typeof faculty.department === 'string') {
+        let deptName = "";
+        if (typeof faculty.department === "string") {
           deptName = faculty.department.toLowerCase();
         } else {
           // For ObjectId departments, we'll skip population for now and match by string later
           return false;
         }
-        
-        return deptName.includes(searchDept) || 
-               searchDept.includes(deptName) ||
-               (deptName.includes('electronic') && (searchDept.includes('electronic') || searchDept.includes('eletronic'))) ||
-               (deptName.includes('eletronic') && (searchDept.includes('electronic') || searchDept.includes('eletronic'))) ||
-               (deptName.includes('computer') && searchDept.includes('computer')) ||
-               (deptName.includes('electrical') && searchDept.includes('electrical')) ||
-               (deptName.includes('mechanical') && searchDept.includes('mechanical')) ||
-               (deptName.includes('civil') && searchDept.includes('civil'));
+
+        return (
+          deptName.includes(searchDept) ||
+          searchDept.includes(deptName) ||
+          (deptName.includes("electronic") &&
+            (searchDept.includes("electronic") ||
+              searchDept.includes("eletronic"))) ||
+          (deptName.includes("eletronic") &&
+            (searchDept.includes("electronic") ||
+              searchDept.includes("eletronic"))) ||
+          (deptName.includes("computer") && searchDept.includes("computer")) ||
+          (deptName.includes("electrical") &&
+            searchDept.includes("electrical")) ||
+          (deptName.includes("mechanical") &&
+            searchDept.includes("mechanical")) ||
+          (deptName.includes("civil") && searchDept.includes("civil"))
+        );
       });
-      
-      searchApproaches.push(`JavaScript filter: ${faculties.length} found from ${allFaculties.length} total`);
-      console.log(`[GetCCAssignments] JavaScript filtering found: ${faculties.length} faculties`);
-      
+
+      searchApproaches.push(
+        `JavaScript filter: ${faculties.length} found from ${allFaculties.length} total`
+      );
+      console.log(
+        `[GetCCAssignments] JavaScript filtering found: ${faculties.length} faculties`
+      );
+
       // Debug: Show what departments we found
-      const foundDepartments = [...new Set(allFaculties.map(f => {
-        if (typeof f.department === 'string') {
-          return f.department;
-        }
-        return 'ObjectId Department';
-      }))];
-      console.log("[GetCCAssignments] Available departments:", foundDepartments);
-      searchApproaches.push(`Available departments: ${foundDepartments.join(', ')}`);
-      
+      const foundDepartments = [
+        ...new Set(
+          allFaculties.map((f) => {
+            if (typeof f.department === "string") {
+              return f.department;
+            }
+            return "ObjectId Department";
+          })
+        ),
+      ];
+      console.log(
+        "[GetCCAssignments] Available departments:",
+        foundDepartments
+      );
+      searchApproaches.push(
+        `Available departments: ${foundDepartments.join(", ")}`
+      );
     } catch (err) {
-      console.log("[GetCCAssignments] JavaScript filtering failed:", err.message);
+      console.log(
+        "[GetCCAssignments] JavaScript filtering failed:",
+        err.message
+      );
       searchApproaches.push(`JavaScript filtering failed: ${err.message}`);
     }
 
     console.log("[GetCCAssignments] Total faculties found:", faculties.length);
-    console.log("[GetCCAssignments] Search approaches tried:", searchApproaches);
+    console.log(
+      "[GetCCAssignments] Search approaches tried:",
+      searchApproaches
+    );
 
     const assignments = [];
     faculties.forEach((faculty) => {
       (faculty.ccAssignments || []).forEach((cc) => {
         // Get department name - for CC assignments, use the faculty's string department
-        let departmentName = '';
-        if (typeof faculty.department === 'string') {
+        let departmentName = "";
+        if (typeof faculty.department === "string") {
           departmentName = faculty.department;
         } else {
           departmentName = department; // fallback to requested department
         }
-        
+
         assignments.push({
           facultyId: faculty._id.toString(),
           name: `${faculty.firstName} ${faculty.lastName || ""}`.trim(),
@@ -967,7 +1056,7 @@ const getCCAssignments = async (req, res) => {
     res.status(200).json({
       success: true,
       data: assignments,
-      searchApproaches: searchApproaches // Include debug info
+      searchApproaches: searchApproaches, // Include debug info
     });
   } catch (error) {
     console.error("[GetCCAssignments] Error:", error);
@@ -998,25 +1087,29 @@ const deleteCCAssignment = async (req, res) => {
     }
 
     console.log("[DeleteCCAssignment] Original department:", department);
-    
+
     // Apply department correction logic (same as assignCC and getCCAssignments)
     const departmentCorrections = {
-      'eletronic enigneering': 'Electronics',
-      'eletronic engineering': 'Electronics',
-      'electronic enigneering': 'Electronics',
-      'electronic engineering': 'Electronics',
-      'computer scince': 'Computer Science',
-      'civil enigneering': 'Civil',
-      'mechanical enigneering': 'Mechanical',
-      'electrical enigneering': 'Electrical',
-      'information tecnology': 'Information Technology',
-      'data scince': 'Data Science',
-      'account': 'Account Section'
+      "eletronic enigneering": "Electronics",
+      "eletronic engineering": "Electronics",
+      "electronic enigneering": "Electronics",
+      "electronic engineering": "Electronics",
+      "computer scince": "Computer Science",
+      "civil enigneering": "Civil",
+      "mechanical enigneering": "Mechanical",
+      "electrical enigneering": "Electrical",
+      "information tecnology": "Information Technology",
+      "data scince": "Data Science",
+      account: "Account Section",
     };
-    
+
     const originalDepartment = department.trim();
-    const correctedDepartment = departmentCorrections[originalDepartment] || originalDepartment;
-    console.log("[DeleteCCAssignment] Corrected department:", correctedDepartment);
+    const correctedDepartment =
+      departmentCorrections[originalDepartment] || originalDepartment;
+    console.log(
+      "[DeleteCCAssignment] Corrected department:",
+      correctedDepartment
+    );
 
     const faculty = await Faculty.findById(facultyId);
     if (!faculty) {
@@ -1026,7 +1119,10 @@ const deleteCCAssignment = async (req, res) => {
     }
 
     console.log("[DeleteCCAssignment] Faculty department:", faculty.department);
-    console.log("[DeleteCCAssignment] Faculty CC assignments:", faculty.ccAssignments);
+    console.log(
+      "[DeleteCCAssignment] Faculty CC assignments:",
+      faculty.ccAssignments
+    );
 
     // Check if assignment exists using multiple department variations
     const assignmentExists = faculty.ccAssignments.some(
@@ -1034,11 +1130,11 @@ const deleteCCAssignment = async (req, res) => {
         cc.academicYear === academicYear &&
         cc.semester === semester &&
         cc.section === section &&
-        (cc.department === correctedDepartment || 
-         cc.department === originalDepartment ||
-         cc.department === faculty.department ||
-         cc.department?.toLowerCase() === originalDepartment.toLowerCase() ||
-         cc.department?.toLowerCase() === correctedDepartment.toLowerCase())
+        (cc.department === correctedDepartment ||
+          cc.department === originalDepartment ||
+          cc.department === faculty.department ||
+          cc.department?.toLowerCase() === originalDepartment.toLowerCase() ||
+          cc.department?.toLowerCase() === correctedDepartment.toLowerCase())
     );
 
     console.log("[DeleteCCAssignment] Assignment exists:", assignmentExists);
@@ -1057,25 +1153,33 @@ const deleteCCAssignment = async (req, res) => {
           cc.academicYear === academicYear &&
           cc.semester === semester &&
           cc.section === section &&
-          (cc.department === correctedDepartment || 
-           cc.department === originalDepartment ||
-           cc.department === faculty.department ||
-           cc.department?.toLowerCase() === originalDepartment.toLowerCase() ||
-           cc.department?.toLowerCase() === correctedDepartment.toLowerCase())
+          (cc.department === correctedDepartment ||
+            cc.department === originalDepartment ||
+            cc.department === faculty.department ||
+            cc.department?.toLowerCase() === originalDepartment.toLowerCase() ||
+            cc.department?.toLowerCase() === correctedDepartment.toLowerCase())
         )
     );
 
-    console.log("[DeleteCCAssignment] Remaining CC assignments:", faculty.ccAssignments.length);
+    console.log(
+      "[DeleteCCAssignment] Remaining CC assignments:",
+      faculty.ccAssignments.length
+    );
 
     if (faculty.ccAssignments.length === 0 && restoreType) {
       if (
         ["teaching", "non-teaching", "HOD", "principal"].includes(restoreType)
       ) {
         faculty.type = restoreType;
-        console.log("[DeleteCCAssignment] Restored faculty type to:", restoreType);
+        console.log(
+          "[DeleteCCAssignment] Restored faculty type to:",
+          restoreType
+        );
       } else {
         faculty.type = "teaching";
-        console.log("[DeleteCCAssignment] Restored faculty type to teaching (default)");
+        console.log(
+          "[DeleteCCAssignment] Restored faculty type to teaching (default)"
+        );
       }
     }
 
@@ -1147,7 +1251,10 @@ const removePrincipalRole = async (req, res) => {
     if (faculty.role !== "principal") {
       return res
         .status(400)
-        .json({ success: false, message: "Faculty is not assigned as Principal" });
+        .json({
+          success: false,
+          message: "Faculty is not assigned as Principal",
+        });
     }
     faculty.role = null;
     faculty.type = "teaching"; // Ensure they remain as teaching faculty
@@ -1175,7 +1282,7 @@ const assignSubject = async (req, res) => {
       facultyId,
       subjectId,
       department,
-      academicYear
+      academicYear,
     });
 
     // Validate inputs
@@ -1189,19 +1296,20 @@ const assignSubject = async (req, res) => {
     // Department corrections mapping
     const departmentCorrections = {
       "eletronic enigneering": "Electronics",
-      "electronics": "Electronics",
-      "electronic": "Electronics",
+      electronics: "Electronics",
+      electronic: "Electronics",
       "computer science": "Computer Science",
-      "cs": "Computer Science",
-      "mechanical": "Mechanical",
-      "civil": "Civil",
-      "electrical": "Electrical"
+      cs: "Computer Science",
+      mechanical: "Mechanical",
+      civil: "Civil",
+      electrical: "Electrical",
     };
 
     // Apply department corrections
     const originalDepartment = department.trim();
     const lowerDept = originalDepartment.toLowerCase();
-    let correctedDepartment = departmentCorrections[lowerDept] || originalDepartment;
+    let correctedDepartment =
+      departmentCorrections[lowerDept] || originalDepartment;
 
     // If no correction found, normalize to title case
     if (!departmentCorrections[lowerDept]) {
@@ -1212,7 +1320,7 @@ const assignSubject = async (req, res) => {
 
     console.log("[AssignSubject] Department correction:", {
       original: originalDepartment,
-      corrected: correctedDepartment
+      corrected: correctedDepartment,
     });
 
     // Verify faculty exists
@@ -1227,7 +1335,7 @@ const assignSubject = async (req, res) => {
     console.log("[AssignSubject] Faculty found:", {
       id: faculty._id,
       name: faculty.name || faculty.firstName,
-      department: faculty.department
+      department: faculty.department,
     });
 
     // Verify subject exists
@@ -1242,25 +1350,29 @@ const assignSubject = async (req, res) => {
     console.log("[AssignSubject] Subject found:", {
       id: subject._id,
       name: subject.name,
-      department: subject.department?.name
+      department: subject.department?.name,
     });
 
     // Check department matching with flexible logic
-    const subjectDept = (subject.department?.name || '').toLowerCase().trim();
+    const subjectDept = (subject.department?.name || "").toLowerCase().trim();
     const requestDept = correctedDepartment.toLowerCase().trim();
-    const facultyDept = (faculty.department || '').toLowerCase().trim();
+    const facultyDept = (faculty.department || "").toLowerCase().trim();
 
-    const departmentMatches = 
+    const departmentMatches =
       subjectDept === requestDept ||
       subjectDept === facultyDept ||
-      (subjectDept.includes('electronic') && (requestDept.includes('electronic') || facultyDept.includes('electronic'))) ||
-      (subjectDept.includes('eletronic') && (requestDept.includes('eletronic') || facultyDept.includes('eletronic')));
+      (subjectDept.includes("electronic") &&
+        (requestDept.includes("electronic") ||
+          facultyDept.includes("electronic"))) ||
+      (subjectDept.includes("eletronic") &&
+        (requestDept.includes("eletronic") ||
+          facultyDept.includes("eletronic")));
 
     if (!departmentMatches) {
       console.log("[AssignSubject] Department mismatch:", {
         subjectDept,
         requestDept,
-        facultyDept
+        facultyDept,
       });
       return res.status(400).json({
         success: false,
@@ -1287,17 +1399,21 @@ const assignSubject = async (req, res) => {
     console.log("[AssignSubject] Subject assigned successfully");
 
     // Populate the updated faculty for response
-    const updatedFaculty = await Faculty.findById(facultyId).populate("subjectsTaught");
+    const updatedFaculty = await Faculty.findById(facultyId).populate(
+      "subjectsTaught"
+    );
 
     return res.status(200).json({
       success: true,
-      message: `Subject "${subject.name}" assigned to ${faculty.name || faculty.firstName} successfully`,
+      message: `Subject "${subject.name}" assigned to ${
+        faculty.name || faculty.firstName
+      } successfully`,
       data: {
         faculty: updatedFaculty,
         subject: subject,
         department: correctedDepartment,
-        academicYear
-      }
+        academicYear,
+      },
     });
   } catch (error) {
     console.error("[AssignSubject] Error:", error);
@@ -1473,54 +1589,76 @@ const getStudentsBySubject = async (req, res) => {
       });
     }
 
-    console.log("[GetStudentsBySubject] AdminSubject found:", adminSubject.name);
+    console.log(
+      "[GetStudentsBySubject] AdminSubject found:",
+      adminSubject.name
+    );
 
     // Strategy 1: Find students who have this AdminSubject in their subjects array
     // (This would require updating student records to use AdminSubject IDs)
     let students = await Student.find({
-      subjects: subjectObjectId
+      subjects: subjectObjectId,
     });
 
-    console.log("[GetStudentsBySubject] Students found with AdminSubject ID:", students.length);
+    console.log(
+      "[GetStudentsBySubject] Students found with AdminSubject ID:",
+      students.length
+    );
 
     // Strategy 2: If no students found with AdminSubject ID, try to find by subject name
     // This is a fallback for existing data
     if (students.length === 0) {
-      console.log("[GetStudentsBySubject] No students found with AdminSubject ID, trying by name...");
-      
+      console.log(
+        "[GetStudentsBySubject] No students found with AdminSubject ID, trying by name..."
+      );
+
       // Find Subject entries that match the AdminSubject name
-      const matchingSubjects = await Subject.find({ 
-        name: { $regex: new RegExp(adminSubject.name, 'i') }
+      const matchingSubjects = await Subject.find({
+        name: { $regex: new RegExp(adminSubject.name, "i") },
       });
-      
-      console.log("[GetStudentsBySubject] Found matching Subject entries:", matchingSubjects.length);
-      
+
+      console.log(
+        "[GetStudentsBySubject] Found matching Subject entries:",
+        matchingSubjects.length
+      );
+
       if (matchingSubjects.length > 0) {
-        const subjectIds = matchingSubjects.map(s => s._id);
+        const subjectIds = matchingSubjects.map((s) => s._id);
         students = await Student.find({
-          subjects: { $in: subjectIds }
+          subjects: { $in: subjectIds },
         });
-        console.log("[GetStudentsBySubject] Students found with matching Subject names:", students.length);
+        console.log(
+          "[GetStudentsBySubject] Students found with matching Subject names:",
+          students.length
+        );
       }
     }
 
     // Strategy 3: If still no students found, get all students from the same department
     // and let frontend handle filtering (temporary solution)
     if (students.length === 0) {
-      console.log("[GetStudentsBySubject] No students found, trying by department...");
-      
+      console.log(
+        "[GetStudentsBySubject] No students found, trying by department..."
+      );
+
       // Get department from AdminSubject
       if (adminSubject.department) {
         const department = await Department.findById(adminSubject.department);
         if (department) {
-          console.log("[GetStudentsBySubject] Searching students in department:", department.name);
-          
+          console.log(
+            "[GetStudentsBySubject] Searching students in department:",
+            department.name
+          );
+
           // Find students in the same department
           students = await Student.find({
-            department: adminSubject.department.toString()
+            department: adminSubject.department.toString(),
           }).limit(50); // Limit to avoid too many results
-          
-          console.log("[GetStudentsBySubject] Students found in department:", students.length);
+
+          console.log(
+            "[GetStudentsBySubject] Students found in department:",
+            students.length
+          );
         }
       }
     }
@@ -1547,7 +1685,7 @@ const getStudentsBySubject = async (req, res) => {
 
     console.log("[GetStudentsBySubject] Final result:", {
       subjectName: adminSubject.name,
-      studentsFound: studentsWithDepartments.length
+      studentsFound: studentsWithDepartments.length,
     });
 
     if (studentsWithDepartments.length === 0) {
@@ -1557,8 +1695,8 @@ const getStudentsBySubject = async (req, res) => {
         subjectInfo: {
           id: adminSubject._id,
           name: adminSubject.name,
-          department: adminSubject.department
-        }
+          department: adminSubject.department,
+        },
       });
     }
 
@@ -1569,8 +1707,8 @@ const getStudentsBySubject = async (req, res) => {
       subjectInfo: {
         id: adminSubject._id,
         name: adminSubject.name,
-        department: adminSubject.department
-      }
+        department: adminSubject.department,
+      },
     });
   } catch (error) {
     console.error("Get Students by Subject Error:", error);
@@ -1593,6 +1731,15 @@ const markAttendance = async (req, res) => {
       facultyId,
     } = req.body;
 
+    console.log("[MarkAttendance] Request data:", {
+      selectedStudents,
+      subjectName,
+      department,
+      year,
+      section,
+      facultyId,
+    });
+
     if (!subjectName || !department || !year || !section || !facultyId) {
       return res.status(400).json({
         success: false,
@@ -1601,29 +1748,58 @@ const markAttendance = async (req, res) => {
       });
     }
 
+    // Find subject by name
     const sub = await Subject.findOne({ name: subjectName });
     if (!sub) {
+      console.log("[MarkAttendance] Subject not found:", subjectName);
       return res.status(404).json({
         success: false,
         message: "Subject not found",
       });
     }
 
+    // Find faculty
     const faculty = await Faculty.findById(facultyId);
     if (!faculty) {
+      console.log("[MarkAttendance] Faculty not found:", facultyId);
       return res.status(404).json({
         success: false,
         message: "Faculty not found",
       });
     }
 
-    const allStudents = await Student.find({ department, year, section });
+    // Find department by name
+    const departmentDoc = await Department.findOne({
+      name: { $regex: new RegExp(`^${department}$`, "i") },
+    });
+    if (!departmentDoc) {
+      console.log("[MarkAttendance] Department not found:", department);
+      return res.status(404).json({
+        success: false,
+        message: "Department not found",
+      });
+    }
+
+    // Find all students matching criteria
+    const allStudents = await Student.find({
+      department: { $in: [department, departmentDoc._id] },
+      year,
+      section,
+    });
+
     if (allStudents.length === 0) {
+      console.log("[MarkAttendance] No students found for criteria:", {
+        department,
+        year,
+        section,
+      });
       return res.status(404).json({
         success: false,
         message: "No students found for the given criteria",
       });
     }
+
+    console.log("[MarkAttendance] Found students:", allStudents.length);
 
     const validStudentIds = allStudents.map((s) => s._id.toString());
     const invalidStudents = selectedStudents.filter(
@@ -1636,36 +1812,50 @@ const markAttendance = async (req, res) => {
       });
     }
 
-    const currentDate = new Date().toISOString().split("T")[0];
+    const currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0); // Set to start of day
 
-    const bulkOps = allStudents.map((student) => ({
-      updateOne: {
-        filter: {
-          student: student._id,
-          subject: sub._id,
-          facultyId,
-          date: currentDate,
-        },
-        update: {
-          $inc: { totalLecturesByFaculty: 1 },
-          $set: {
-            attendance: selectedStudents.includes(student._id.toString())
-              ? 100
-              : 0,
-          },
-        },
-        upsert: true,
-      },
+    // Create attendance records
+    const attendanceRecords = allStudents.map((student) => ({
+      student: student._id,
+      subject: sub._id,
+      faculty: facultyId,
+      date: currentDate,
+      status: selectedStudents.includes(student._id.toString())
+        ? "present"
+        : "absent",
+      semester:
+        sub.semester || faculty.semester || new mongoose.Types.ObjectId(), // Use a default ObjectId if not available
+      department: departmentDoc._id,
     }));
 
-    await Attendance.bulkWrite(bulkOps);
+    console.log(
+      "[MarkAttendance] Creating attendance records:",
+      attendanceRecords.length
+    );
+
+    // Use deleteMany and insertMany for better error handling
+    await Attendance.deleteMany({
+      subject: sub._id,
+      faculty: facultyId,
+      date: currentDate,
+    });
+
+    await Attendance.insertMany(attendanceRecords);
+
+    console.log("[MarkAttendance] Attendance marked successfully");
 
     return res.status(200).json({
       success: true,
       message: "Attendance marked successfully",
+      data: {
+        totalStudents: allStudents.length,
+        presentStudents: selectedStudents.length,
+        absentStudents: allStudents.length - selectedStudents.length,
+      },
     });
   } catch (error) {
-    console.error("Mark Attendance Error:", error);
+    console.error("[MarkAttendance] Error:", error);
     return res.status(500).json({
       success: false,
       message: "Internal server error",
@@ -1687,23 +1877,25 @@ const getStudentsByDepartment = async (req, res) => {
 
     // First, find the department by name to get its ObjectId
     // Try multiple search strategies
-    let departmentDoc = await Department.findOne({ 
-      name: { $regex: new RegExp(`^${department}$`, 'i') } // Exact match, case-insensitive
+    let departmentDoc = await Department.findOne({
+      name: { $regex: new RegExp(`^${department}$`, "i") }, // Exact match, case-insensitive
     });
-    
+
     if (!departmentDoc) {
       // Try partial match
-      departmentDoc = await Department.findOne({ 
-        name: { $regex: new RegExp(department, 'i') } // Partial match, case-insensitive
+      departmentDoc = await Department.findOne({
+        name: { $regex: new RegExp(department, "i") }, // Partial match, case-insensitive
       });
     }
 
     if (!departmentDoc) {
       // Let's get all departments to help with debugging
-      const allDepartments = await Department.find({}).select('name').populate('stream', 'name');
-      console.log('Available academic departments:', allDepartments);
-      console.log('Requested department:', department);
-      
+      const allDepartments = await Department.find({})
+        .select("name")
+        .populate("stream", "name");
+      console.log("Available academic departments:", allDepartments);
+      console.log("Requested department:", department);
+
       return res.status(404).json({
         success: false,
         message: `Department '${department}' not found`,
@@ -1711,44 +1903,56 @@ const getStudentsByDepartment = async (req, res) => {
       });
     }
 
-    console.log('Found department:', departmentDoc);
+    console.log("Found department:", departmentDoc);
 
     // Get only current/active students using the department ObjectId
-    const students = await Student.find({ 
+    const students = await Student.find({
       department: departmentDoc._id,
       // Add any additional conditions to filter only current students
       // For example, if you have a status field:
       // status: { $ne: 'graduated' }
     })
-    .populate('department', 'name') // Populate department info (AcademicDepartment only has name and stream)
-    .select('firstName middleName lastName fatherName motherName email section semester department subjects studentId dateOfBirth mobileNumber gender photo')
-    .lean();
+      .populate("department", "name") // Populate department info (AcademicDepartment only has name and stream)
+      .select(
+        "firstName middleName lastName fatherName motherName email section semester department subjects studentId dateOfBirth mobileNumber gender photo"
+      )
+      .lean();
 
     // Transform student data to include proper name field
-    const transformedStudents = students.map(student => ({
+    const transformedStudents = students.map((student) => ({
       ...student,
       name: [student.firstName, student.middleName, student.lastName]
         .filter(Boolean)
-        .join(' '),
-      year: student.semester ? 
-        (student.semester.toString().includes('1') || student.semester.toString().includes('2') ? 1 :
-         student.semester.toString().includes('3') || student.semester.toString().includes('4') ? 2 :
-         student.semester.toString().includes('5') || student.semester.toString().includes('6') ? 3 :
-         student.semester.toString().includes('7') || student.semester.toString().includes('8') ? 4 : 1) : 1,
+        .join(" "),
+      year: student.semester
+        ? student.semester.toString().includes("1") ||
+          student.semester.toString().includes("2")
+          ? 1
+          : student.semester.toString().includes("3") ||
+            student.semester.toString().includes("4")
+          ? 2
+          : student.semester.toString().includes("5") ||
+            student.semester.toString().includes("6")
+          ? 3
+          : student.semester.toString().includes("7") ||
+            student.semester.toString().includes("8")
+          ? 4
+          : 1
+        : 1,
       department: student.department?.name || department,
-      dob: student.dateOfBirth
+      dob: student.dateOfBirth,
     }));
 
     // Calculate statistics even if no students found
     const stats = {
       totalStudents: transformedStudents.length,
       yearWiseCount: transformedStudents.reduce((acc, student) => {
-        const year = student.year || 'Unknown';
+        const year = student.year || "Unknown";
         acc[year] = (acc[year] || 0) + 1;
         return acc;
       }, {}),
       sectionWiseCount: transformedStudents.reduce((acc, student) => {
-        const section = student.section || 'Unknown';
+        const section = student.section || "Unknown";
         acc[section] = (acc[section] || 0) + 1;
         return acc;
       }, {}),
@@ -1760,7 +1964,7 @@ const getStudentsByDepartment = async (req, res) => {
       data: {
         students: transformedStudents,
         stats,
-        department: departmentDoc.name
+        department: departmentDoc.name,
       },
     });
   } catch (error) {
@@ -1786,18 +1990,18 @@ const getStudentsWithAttendance = async (req, res) => {
     }
 
     // Find the department by name
-    let departmentDoc = await Department.findOne({ 
-      name: { $regex: new RegExp(`^${department}$`, 'i') } 
+    let departmentDoc = await Department.findOne({
+      name: { $regex: new RegExp(`^${department}$`, "i") },
     });
-    
+
     if (!departmentDoc) {
-      departmentDoc = await Department.findOne({ 
-        name: { $regex: new RegExp(department, 'i') } 
+      departmentDoc = await Department.findOne({
+        name: { $regex: new RegExp(department, "i") },
       });
     }
 
     if (!departmentDoc) {
-      const allDepartments = await Department.find({}).select('name');
+      const allDepartments = await Department.find({}).select("name");
       return res.status(404).json({
         success: false,
         message: `Department '${department}' not found`,
@@ -1806,22 +2010,24 @@ const getStudentsWithAttendance = async (req, res) => {
     }
 
     // Get students with all necessary fields including caste
-    const students = await Student.find({ 
+    const students = await Student.find({
       department: departmentDoc._id,
     })
-    .populate('department', 'name')
-    .select('firstName middleName lastName fatherName motherName email section semester department subjects studentId dateOfBirth mobileNumber gender photo casteCategory subCaste')
-    .lean();
+      .populate("department", "name")
+      .select(
+        "firstName middleName lastName fatherName motherName email section semester department subjects studentId dateOfBirth mobileNumber gender photo casteCategory subCaste"
+      )
+      .lean();
 
     // Get attendance data for all students
-    const studentIds = students.map(student => student._id);
-    
+    const studentIds = students.map((student) => student._id);
+
     // Calculate attendance statistics for each student
     const attendanceData = await Attendance.aggregate([
       {
         $match: {
-          student: { $in: studentIds }
-        }
+          student: { $in: studentIds },
+        },
       },
       {
         $group: {
@@ -1829,86 +2035,147 @@ const getStudentsWithAttendance = async (req, res) => {
           totalClasses: { $sum: 1 },
           attendedClasses: {
             $sum: {
-              $cond: [{ $eq: ["$status", "present"] }, 1, 0]
-            }
-          }
-        }
-      }
+              $cond: [{ $eq: ["$status", "present"] }, 1, 0],
+            },
+          },
+        },
+      },
     ]);
 
     // Create a map for quick lookup of attendance data
     const attendanceMap = {};
-    attendanceData.forEach(item => {
-      const percentage = item.totalClasses > 0 ? 
-        Math.round((item.attendedClasses / item.totalClasses) * 100) : 0;
+    attendanceData.forEach((item) => {
+      const percentage =
+        item.totalClasses > 0
+          ? Math.round((item.attendedClasses / item.totalClasses) * 100)
+          : 0;
       attendanceMap[item._id.toString()] = {
         totalClasses: item.totalClasses,
         attendedClasses: item.attendedClasses,
-        attendancePercentage: percentage
+        attendancePercentage: percentage,
       };
     });
 
-    // Transform student data and include attendance
-    const transformedStudents = students.map(student => ({
+    // Get scholarship data for all students
+    const studentIdsForScholarship = students
+      .map((student) => student.studentId)
+      .filter(Boolean);
+    const scholarshipData = await Scholarship.find({
+      studentId: { $in: studentIdsForScholarship },
+    }).lean();
+
+    // Create a map for quick lookup of scholarship data
+    const scholarshipMap = {};
+    scholarshipData.forEach((scholarship) => {
+      scholarshipMap[scholarship.studentId] = {
+        scholarshipStatus: scholarship.scholarshipStatus || "No",
+        scholarshipRemarks:
+          scholarship.pdfs && scholarship.pdfs.length > 0
+            ? scholarship.pdfs.map((pdf) => ({
+                year: pdf.year,
+                remark: pdf.remark || "No remark",
+                pdfUrl: pdf.pdfUrl,
+                uploadedAt: pdf.uploadedAt,
+              }))
+            : [],
+        latestRemark:
+          scholarship.pdfs && scholarship.pdfs.length > 0
+            ? scholarship.pdfs
+                .filter((pdf) => pdf.remark && pdf.remark.trim() !== "")
+                .sort(
+                  (a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt)
+                )[0]?.remark || "No remark"
+            : "No remark",
+      };
+    });
+
+    // Transform student data and include attendance and scholarship information
+    const transformedStudents = students.map((student) => ({
       ...student,
       name: [student.firstName, student.middleName, student.lastName]
         .filter(Boolean)
-        .join(' '),
-      year: student.semester ? 
-        (student.semester.toString().includes('1') || student.semester.toString().includes('2') ? 1 :
-         student.semester.toString().includes('3') || student.semester.toString().includes('4') ? 2 :
-         student.semester.toString().includes('5') || student.semester.toString().includes('6') ? 3 :
-         student.semester.toString().includes('7') || student.semester.toString().includes('8') ? 4 : 1) : 1,
+        .join(" "),
+      year: student.semester
+        ? student.semester.toString().includes("1") ||
+          student.semester.toString().includes("2")
+          ? 1
+          : student.semester.toString().includes("3") ||
+            student.semester.toString().includes("4")
+          ? 2
+          : student.semester.toString().includes("5") ||
+            student.semester.toString().includes("6")
+          ? 3
+          : student.semester.toString().includes("7") ||
+            student.semester.toString().includes("8")
+          ? 4
+          : 1
+        : 1,
       department: student.department?.name || department,
       dob: student.dateOfBirth,
-      caste: student.casteCategory || 'Not Specified',
-      subCaste: student.subCaste || '',
+      caste: student.casteCategory || "Not Specified",
+      subCaste: student.subCaste || "",
       attendance: attendanceMap[student._id.toString()] || {
         totalClasses: 0,
         attendedClasses: 0,
-        attendancePercentage: 0
-      }
+        attendancePercentage: 0,
+      },
+      scholarship: scholarshipMap[student.studentId] || {
+        scholarshipStatus: "No",
+        scholarshipRemarks: [],
+        latestRemark: "No remark",
+      },
     }));
 
     // Sort by caste category (General, OBC, SC, ST, etc.)
-    const casteOrder = ['General', 'OBC', 'SC', 'ST', 'EWS', 'Not Specified'];
+    const casteOrder = ["General", "OBC", "SC", "ST", "EWS", "Not Specified"];
     transformedStudents.sort((a, b) => {
       const aIndex = casteOrder.indexOf(a.caste);
       const bIndex = casteOrder.indexOf(b.caste);
-      
+
       // If caste not found in order array, put it at the end
       const aOrder = aIndex === -1 ? casteOrder.length : aIndex;
       const bOrder = bIndex === -1 ? casteOrder.length : bIndex;
-      
+
       if (aOrder !== bOrder) {
         return aOrder - bOrder;
       }
-      
+
       // If same caste, sort by name
       return a.name.localeCompare(b.name);
     });
 
-    // Calculate statistics
+    // Calculate statistics including scholarship stats
     const stats = {
       totalStudents: transformedStudents.length,
       yearWiseCount: transformedStudents.reduce((acc, student) => {
-        const year = student.year || 'Unknown';
+        const year = student.year || "Unknown";
         acc[year] = (acc[year] || 0) + 1;
         return acc;
       }, {}),
       sectionWiseCount: transformedStudents.reduce((acc, student) => {
-        const section = student.section || 'Unknown';
+        const section = student.section || "Unknown";
         acc[section] = (acc[section] || 0) + 1;
         return acc;
       }, {}),
       casteWiseCount: transformedStudents.reduce((acc, student) => {
-        const caste = student.caste || 'Not Specified';
+        const caste = student.caste || "Not Specified";
         acc[caste] = (acc[caste] || 0) + 1;
         return acc;
       }, {}),
-      averageAttendance: transformedStudents.length > 0 ? 
-        Math.round(transformedStudents.reduce((sum, student) => 
-          sum + student.attendance.attendancePercentage, 0) / transformedStudents.length) : 0
+      scholarshipWiseCount: transformedStudents.reduce((acc, student) => {
+        const status = student.scholarship.scholarshipStatus || "No";
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      }, {}),
+      averageAttendance:
+        transformedStudents.length > 0
+          ? Math.round(
+              transformedStudents.reduce(
+                (sum, student) => sum + student.attendance.attendancePercentage,
+                0
+              ) / transformedStudents.length
+            )
+          : 0,
     };
 
     return res.status(200).json({
@@ -1917,7 +2184,7 @@ const getStudentsWithAttendance = async (req, res) => {
       data: {
         students: transformedStudents,
         stats,
-        department: departmentDoc.name
+        department: departmentDoc.name,
       },
     });
   } catch (error) {
@@ -1933,14 +2200,14 @@ const getStudentsWithAttendance = async (req, res) => {
 const getCCClassStudents = async (req, res) => {
   try {
     console.log("[GetCCClassStudents] Request from user:", req.user);
-    
+
     // Get faculty ID from authenticated user
     const facultyId = req.user.facultyId || req.user._id || req.user.id;
-    
+
     if (!facultyId) {
       return res.status(400).json({
         success: false,
-        message: "Faculty ID is required"
+        message: "Faculty ID is required",
       });
     }
 
@@ -1952,7 +2219,7 @@ const getCCClassStudents = async (req, res) => {
     if (!faculty) {
       return res.status(404).json({
         success: false,
-        message: "Faculty not found"
+        message: "Faculty not found",
       });
     }
 
@@ -1962,7 +2229,7 @@ const getCCClassStudents = async (req, res) => {
     if (!faculty.ccAssignments || faculty.ccAssignments.length === 0) {
       return res.status(404).json({
         success: false,
-        message: "No CC assignments found for this faculty"
+        message: "No CC assignments found for this faculty",
       });
     }
 
@@ -1971,40 +2238,42 @@ const getCCClassStudents = async (req, res) => {
     console.log("[GetCCClassStudents] CC Assignment:", ccAssignment);
 
     // Get faculty department
-    let departmentName = '';
-    if (typeof faculty.department === 'string') {
+    let departmentName = "";
+    if (typeof faculty.department === "string") {
       departmentName = faculty.department;
     } else {
       // If department is ObjectId, we need to get it from the assignment or faculty data
-      departmentName = faculty.department || '';
+      departmentName = faculty.department || "";
     }
 
     // Build query to find students matching CC's assignment
     const studentQuery = {};
-    
+
     // Match department
     if (departmentName) {
-      studentQuery.department = new RegExp(departmentName, 'i');
+      studentQuery.department = new RegExp(departmentName, "i");
     }
-    
+
     // Match academic year and semester from CC assignment
     if (ccAssignment.academicYear) {
       studentQuery.year = ccAssignment.academicYear;
     }
-    
+
     if (ccAssignment.semester) {
       studentQuery.semester = ccAssignment.semester;
     }
-    
+
     if (ccAssignment.section) {
-      studentQuery.section = new RegExp(ccAssignment.section, 'i');
+      studentQuery.section = new RegExp(ccAssignment.section, "i");
     }
 
     console.log("[GetCCClassStudents] Student query:", studentQuery);
 
     // Fetch students matching the criteria
     const students = await Student.find(studentQuery)
-      .select("name enrollmentNumber email phone year section department gender status dateOfBirth address casteCategory subCaste")
+      .select(
+        "name enrollmentNumber email phone year section department gender status dateOfBirth address casteCategory subCaste"
+      )
       .lean();
 
     console.log("[GetCCClassStudents] Students found:", students.length);
@@ -2015,35 +2284,50 @@ const getCCClassStudents = async (req, res) => {
         try {
           // Get attendance records for this student
           const attendanceRecords = await Attendance.find({
-            student: student._id
+            student: student._id,
           }).lean();
 
           // Calculate attendance percentage
           const totalClasses = attendanceRecords.length;
-          const presentClasses = attendanceRecords.filter(record => record.status === 'present').length;
-          const attendancePercentage = totalClasses > 0 ? Math.round((presentClasses / totalClasses) * 100) : 0;
+          const presentClasses = attendanceRecords.filter(
+            (record) => record.status === "present"
+          ).length;
+          const attendancePercentage =
+            totalClasses > 0
+              ? Math.round((presentClasses / totalClasses) * 100)
+              : 0;
 
           return {
             ...student,
             attendancePercentage,
             totalClasses,
-            presentClasses
+            presentClasses,
           };
         } catch (err) {
-          console.error("[GetCCClassStudents] Error calculating attendance for student:", student._id, err);
+          console.error(
+            "[GetCCClassStudents] Error calculating attendance for student:",
+            student._id,
+            err
+          );
           return {
             ...student,
             attendancePercentage: 0,
             totalClasses: 0,
-            presentClasses: 0
+            presentClasses: 0,
           };
         }
       })
     );
 
     // Calculate average attendance
-    const totalAttendance = studentsWithAttendance.reduce((sum, student) => sum + student.attendancePercentage, 0);
-    const averageAttendance = studentsWithAttendance.length > 0 ? Math.round(totalAttendance / studentsWithAttendance.length) : 0;
+    const totalAttendance = studentsWithAttendance.reduce(
+      (sum, student) => sum + student.attendancePercentage,
+      0
+    );
+    const averageAttendance =
+      studentsWithAttendance.length > 0
+        ? Math.round(totalAttendance / studentsWithAttendance.length)
+        : 0;
 
     res.status(200).json({
       success: true,
@@ -2055,18 +2339,17 @@ const getCCClassStudents = async (req, res) => {
           department: departmentName,
           academicYear: ccAssignment.academicYear,
           semester: ccAssignment.semester,
-          section: ccAssignment.section
-        }
+          section: ccAssignment.section,
+        },
       },
-      message: `Found ${studentsWithAttendance.length} students for CC assignment`
+      message: `Found ${studentsWithAttendance.length} students for CC assignment`,
     });
-
   } catch (error) {
     console.error("[GetCCClassStudents] Error:", error);
     res.status(500).json({
       success: false,
       message: "Internal server error",
-      error: error.message
+      error: error.message,
     });
   }
 };

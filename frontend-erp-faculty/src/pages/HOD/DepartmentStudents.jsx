@@ -11,6 +11,7 @@ const DepartmentStudents = ({ userData }) => {
   const [filterBy, setFilterBy] = useState("all");
   const [selectedCaste, setSelectedCaste] = useState("all");
   const [selectedSubCaste, setSelectedSubCaste] = useState("all");
+  const [selectedScholarshipStatus, setSelectedScholarshipStatus] = useState("all");
   const [stats, setStats] = useState({
     totalStudents: 0,
     activeStudents: 0,
@@ -18,6 +19,7 @@ const DepartmentStudents = ({ userData }) => {
     yearWiseData: {},
     sectionWiseData: {},
     casteWiseData: {},
+    scholarshipWiseData: {},
     averageAttendance: 0
   });
 
@@ -52,10 +54,10 @@ const DepartmentStudents = ({ userData }) => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Get token with fallback
       const token = userData?.token || localStorage.getItem("authToken");
-      
+
       if (!token) {
         setError("Authentication token not found. Please log in again.");
         setLoading(false);
@@ -63,15 +65,15 @@ const DepartmentStudents = ({ userData }) => {
       }
 
       // Get department with fallback
-      const userDepartment = userData?.department || 
-                           JSON.parse(localStorage.getItem("user") || "{}")?.department;
+      const userDepartment = userData?.department ||
+        JSON.parse(localStorage.getItem("user") || "{}")?.department;
 
       if (!userDepartment) {
         setError("Department information not found. Please contact administrator.");
         setLoading(false);
         return;
       }
-      
+
       const response = await axios.get(
         `http://localhost:5000/api/faculty/students-attendance/department/${encodeURIComponent(userDepartment)}`,
         {
@@ -82,7 +84,7 @@ const DepartmentStudents = ({ userData }) => {
       if (response.data.success) {
         const students = response.data.data.students || [];
         const apiStats = response.data.data.stats || {};
-        
+
         // Handle case where no students are found
         if (students.length === 0) {
           setStudentsData([]);
@@ -93,13 +95,14 @@ const DepartmentStudents = ({ userData }) => {
             yearWiseData: {},
             sectionWiseData: {},
             casteWiseData: {},
+            scholarshipWiseData: {},
             averageAttendance: 0
           });
           setError("No students found for this department. This could be normal if no students are currently enrolled.");
           setLoading(false);
           return;
         }
-        
+
         // Transform the data to match our frontend format
         const transformedStudents = students.map(student => ({
           id: student._id,
@@ -119,6 +122,9 @@ const DepartmentStudents = ({ userData }) => {
           motherName: student.motherName,
           caste: student.caste || 'Not Specified',
           subCaste: student.subCaste || '',
+          scholarshipStatus: student.scholarship?.scholarshipStatus || 'No',
+          scholarshipRemarks: student.scholarship?.scholarshipRemarks || [],
+          latestScholarshipRemark: student.scholarship?.latestRemark || 'No remark',
           attendance: student.attendance || {
             totalClasses: 0,
             attendedClasses: 0,
@@ -135,6 +141,7 @@ const DepartmentStudents = ({ userData }) => {
           yearWiseData: {},
           sectionWiseData: {},
           casteWiseData: {},
+          scholarshipWiseData: {},
           averageAttendance: 0
         });
       } else {
@@ -144,7 +151,7 @@ const DepartmentStudents = ({ userData }) => {
     } catch (err) {
       console.error("Error fetching students:", err);
       console.error("Response data:", err.response?.data);
-      
+
       if (err.response?.status === 401) {
         setError("Session expired. Please log in again.");
         localStorage.removeItem("user");
@@ -165,6 +172,7 @@ const DepartmentStudents = ({ userData }) => {
           yearWiseData: {},
           sectionWiseData: {},
           casteWiseData: {},
+          scholarshipWiseData: {},
           averageAttendance: 0
         });
       } else {
@@ -179,11 +187,11 @@ const DepartmentStudents = ({ userData }) => {
   const calculateAcademicYear = (year) => {
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth();
-    
+
     // Academic year starts in August (month 7)
     const academicStartYear = currentMonth >= 7 ? currentYear : currentYear - 1;
     const academicEndYear = academicStartYear + 1;
-    
+
     return `${academicStartYear}-${academicEndYear.toString().slice(-2)}`;
   };
 
@@ -221,28 +229,32 @@ const DepartmentStudents = ({ userData }) => {
 
   const filteredStudents = studentsData.filter(student => {
     const matchesSearch = student.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.rollNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.fatherName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.contactNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.caste?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.subCaste?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.section?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+      student.rollNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.fatherName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.contactNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.caste?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.subCaste?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.section?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.scholarshipStatus?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.latestScholarshipRemark?.toLowerCase().includes(searchTerm.toLowerCase());
+
     const matchesYear = !selectedYear || student.year?.toString() === selectedYear;
-    
+
     const matchesFilter = filterBy === "all" || student.status === filterBy;
-    
+
     const matchesCaste = selectedCaste === "all" || student.caste === selectedCaste;
-    
+
     const matchesSubCaste = selectedSubCaste === "all" || student.subCaste === selectedSubCaste;
-    
-    return matchesSearch && matchesYear && matchesFilter && matchesCaste && matchesSubCaste;
+
+    const matchesScholarship = selectedScholarshipStatus === "all" || student.scholarshipStatus === selectedScholarshipStatus;
+
+    return matchesSearch && matchesYear && matchesFilter && matchesCaste && matchesSubCaste && matchesScholarship;
   });
 
   const exportData = () => {
     const csvContent = [
-      ["Name", "Roll Number", "Email", "Year", "Section", "Department", "Contact", "Gender", "Father Name", "Caste", "Sub Caste", "Attendance %"],
+      ["Name", "Roll Number", "Email", "Year", "Section", "Department", "Contact", "Gender", "Father Name", "Caste", "Sub Caste", "Scholarship Status", "Latest Remark", "Attendance %"],
       ...filteredStudents.map(student => [
         student.name || "",
         student.rollNumber || "",
@@ -255,6 +267,8 @@ const DepartmentStudents = ({ userData }) => {
         student.fatherName || "",
         student.caste || "",
         student.subCaste || "",
+        student.scholarshipStatus || "No",
+        student.latestScholarshipRemark || "No remark",
         student.attendance?.attendancePercentage || 0
       ])
     ].map(row => row.join(",")).join("\n");
@@ -263,7 +277,7 @@ const DepartmentStudents = ({ userData }) => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${userData?.department}_students_${selectedYear ? `year_${selectedYear}_` : ''}${selectedCaste !== 'all' ? `caste_${selectedCaste}_` : ''}${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `${userData?.department}_students_${selectedYear ? `year_${selectedYear}_` : ''}${selectedCaste !== 'all' ? `caste_${selectedCaste}_` : ''}${selectedScholarshipStatus !== 'all' ? `scholarship_${selectedScholarshipStatus}_` : ''}${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
   };
@@ -275,6 +289,7 @@ const DepartmentStudents = ({ userData }) => {
     setFilterBy("all");
     setSelectedCaste("all");
     setSelectedSubCaste("all");
+    setSelectedScholarshipStatus("all");
   };
 
   if (loading) {
@@ -319,7 +334,7 @@ const DepartmentStudents = ({ userData }) => {
           )}
 
           {/* Statistics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-6 mb-8">
             <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg">
               <div className="flex items-center justify-between">
                 <div>
@@ -369,6 +384,17 @@ const DepartmentStudents = ({ userData }) => {
                 <Users className="h-12 w-12 text-pink-200" />
               </div>
             </div>
+
+            <div className="bg-gradient-to-br from-teal-500 to-cyan-600 rounded-2xl p-6 text-white shadow-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-teal-100 text-sm font-medium">Scholarships</p>
+                  <p className="text-3xl font-bold">{(stats.scholarshipWiseData?.Yes || 0)}</p>
+                  <p className="text-xs text-teal-200">Approved</p>
+                </div>
+                <GraduationCap className="h-12 w-12 text-teal-200" />
+              </div>
+            </div>
           </div>
 
           {/* Filters and Search */}
@@ -382,7 +408,7 @@ const DepartmentStudents = ({ userData }) => {
                 Clear All Filters
               </button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-7 gap-6">
               {/* Search */}
               <div className="group">
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
@@ -394,7 +420,7 @@ const DepartmentStudents = ({ userData }) => {
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search by name, roll, email, caste, subcaste, section..."
+                    placeholder="Search by name, roll, email, caste, subcaste, section, scholarship..."
                     className="w-full pl-10 pr-4 py-4 bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 hover:bg-white/90 focus:bg-white shadow-sm text-gray-700 font-medium"
                   />
                 </div>
@@ -480,6 +506,25 @@ const DepartmentStudents = ({ userData }) => {
                 </div>
               </div>
 
+              {/* Scholarship Status Filter */}
+              <div className="group">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  🎓 Filter by Scholarship
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedScholarshipStatus}
+                    onChange={(e) => setSelectedScholarshipStatus(e.target.value)}
+                    className="w-full px-4 py-4 bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 hover:bg-white/90 focus:bg-white shadow-sm text-gray-700 font-medium appearance-none"
+                  >
+                    <option value="all">All Students</option>
+                    <option value="Yes">Scholarship Approved</option>
+                    <option value="No">No Scholarship</option>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5 pointer-events-none" />
+                </div>
+              </div>
+
               {/* Export Button */}
               <div className="group">
                 <label className="block text-sm font-semibold text-gray-700 mb-3">
@@ -504,7 +549,7 @@ const DepartmentStudents = ({ userData }) => {
                   👥 Current Students List
                 </h3>
                 <div className="flex items-center space-x-4">
-                  {(searchTerm || selectedYear || filterBy !== "all" || selectedCaste !== "all" || selectedSubCaste !== "all") && (
+                  {(searchTerm || selectedYear || filterBy !== "all" || selectedCaste !== "all" || selectedSubCaste !== "all" || selectedScholarshipStatus !== "all") && (
                     <span className="text-xs bg-yellow-100 px-3 py-1 rounded-full font-medium text-yellow-700">
                       Filtered Results
                     </span>
@@ -520,7 +565,7 @@ const DepartmentStudents = ({ userData }) => {
                   <div className="text-gray-400 text-6xl mb-4">👥</div>
                   <h3 className="text-xl font-semibold text-gray-600 mb-2">No Students Found</h3>
                   <p className="text-gray-500">
-                    {searchTerm || selectedYear || filterBy !== "all" || selectedCaste !== "all" || selectedSubCaste !== "all"
+                    {searchTerm || selectedYear || filterBy !== "all" || selectedCaste !== "all" || selectedSubCaste !== "all" || selectedScholarshipStatus !== "all"
                       ? "Try adjusting your search criteria or filters"
                       : "No current students are enrolled in this department"
                     }
@@ -540,13 +585,15 @@ const DepartmentStudents = ({ userData }) => {
                         <th className="text-left py-4 px-6 font-semibold text-gray-700">👥 Gender</th>
                         <th className="text-left py-4 px-6 font-semibold text-gray-700">🏷️ Caste</th>
                         <th className="text-left py-4 px-6 font-semibold text-gray-700">🏷️ Sub Caste</th>
+                        <th className="text-left py-4 px-6 font-semibold text-gray-700">🎓 Scholarship</th>
+                        <th className="text-left py-4 px-6 font-semibold text-gray-700">💬 Remark</th>
                         <th className="text-left py-4 px-6 font-semibold text-gray-700">📊 Attendance</th>
                         <th className="text-left py-4 px-6 font-semibold text-gray-700">📋 Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredStudents.map((student, index) => (
-                        <tr 
+                        <tr
                           key={student.id}
                           className="border-b border-gray-100 hover:bg-blue-50/50 transition-colors duration-200"
                         >
@@ -581,39 +628,54 @@ const DepartmentStudents = ({ userData }) => {
                             {student.contactNumber || 'N/A'}
                           </td>
                           <td className="py-4 px-6">
-                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                              student.gender === 'Male' ? 'bg-blue-100 text-blue-800' : 
-                              student.gender === 'Female' ? 'bg-pink-100 text-pink-800' : 
-                              'bg-gray-100 text-gray-800'
-                            }`}>
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${student.gender === 'Male' ? 'bg-blue-100 text-blue-800' :
+                                student.gender === 'Female' ? 'bg-pink-100 text-pink-800' :
+                                  'bg-gray-100 text-gray-800'
+                              }`}>
                               {student.gender || 'N/A'}
                             </span>
                           </td>
                           <td className="py-4 px-6">
-                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                              student.caste === 'General' ? 'bg-purple-100 text-purple-800' :
-                              student.caste === 'OBC' ? 'bg-yellow-100 text-yellow-800' :
-                              student.caste === 'SC' ? 'bg-green-100 text-green-800' :
-                              student.caste === 'ST' ? 'bg-red-100 text-red-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${student.caste === 'General' ? 'bg-purple-100 text-purple-800' :
+                                student.caste === 'OBC' ? 'bg-yellow-100 text-yellow-800' :
+                                  student.caste === 'SC' ? 'bg-green-100 text-green-800' :
+                                    student.caste === 'ST' ? 'bg-red-100 text-red-800' :
+                                      'bg-gray-100 text-gray-800'
+                              }`}>
                               {student.caste || 'Not Specified'}
                             </span>
                           </td>
                           <td className="py-4 px-6">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              student.subCaste ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-500'
-                            }`}>
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${student.subCaste ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-500'
+                              }`}>
                               {student.subCaste || 'Not Specified'}
                             </span>
                           </td>
                           <td className="py-4 px-6">
-                            <div className="flex items-center space-x-2">
-                              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm ${
-                                student.attendance?.attendancePercentage >= 75 ? 'bg-green-500' :
-                                student.attendance?.attendancePercentage >= 60 ? 'bg-yellow-500' :
-                                'bg-red-500'
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${student.scholarshipStatus === 'Yes' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                               }`}>
+                              {student.scholarshipStatus === 'Yes' ? '✅ Approved' : '❌ Not Approved'}
+                            </span>
+                          </td>
+                          <td className="py-4 px-6">
+                            <div className="max-w-48">
+                              <span className={`inline-block px-2 py-1 rounded text-xs ${student.latestScholarshipRemark === 'No remark' ? 'bg-gray-100 text-gray-600' : 'bg-blue-100 text-blue-800'
+                                }`}>
+                                {student.latestScholarshipRemark}
+                              </span>
+                              {student.scholarshipRemarks && student.scholarshipRemarks.length > 0 && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {student.scholarshipRemarks.length} remark(s)
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-4 px-6">
+                            <div className="flex items-center space-x-2">
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm ${student.attendance?.attendancePercentage >= 75 ? 'bg-green-500' :
+                                  student.attendance?.attendancePercentage >= 60 ? 'bg-yellow-500' :
+                                    'bg-red-500'
+                                }`}>
                                 {student.attendance?.attendancePercentage || 0}%
                               </div>
                               <div className="text-xs text-gray-500">
@@ -623,9 +685,8 @@ const DepartmentStudents = ({ userData }) => {
                             </div>
                           </td>
                           <td className="py-4 px-6">
-                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                              student.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                            }`}>
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${student.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                              }`}>
                               {student.status === 'active' ? '✅ Active' : '⏸️ Inactive'}
                             </span>
                           </td>

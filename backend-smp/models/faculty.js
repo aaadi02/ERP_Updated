@@ -6,14 +6,12 @@ const facultySchema = new mongoose.Schema({
     {
       academicYear: { type: String, required: true },
       semester: { 
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Semester",
+        type: mongoose.Schema.Types.Mixed, // Allow both ObjectId and String
         required: true 
       },
       section: { type: String, required: true },
       department: { 
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "AcademicDepartment",
+        type: mongoose.Schema.Types.Mixed, // Allow both ObjectId and String
         required: true 
       },
       assignedAt: { type: Date, default: Date.now },
@@ -70,8 +68,7 @@ const facultySchema = new mongoose.Schema({
     default: null,
   },
   department: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "AcademicDepartment",
+    type: mongoose.Schema.Types.Mixed, // Allow both ObjectId and String for backward compatibility
     required: true,
   },
   address: {

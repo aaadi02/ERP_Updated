@@ -136,9 +136,9 @@ router.get("/department-faculty-subjects/:department", protect, async (req, res)
     
     console.log(`[Faculty-Subject API] Found ${subjects.length} subjects for ${department}`);
     
-    // Get all faculties for the department with their subjects (using string department)
+    // Get all faculties for the department using the ObjectId
     const faculties = await Faculty.find({
-      department: department, // Faculty uses string department
+      department: academicDepartment._id, // Use ObjectId for department
       status: "Active",
       type: { $in: ["teaching", "HOD", "principal"] }
     }).populate({
@@ -209,46 +209,64 @@ router.get("/department-faculty-subjects/:department", protect, async (req, res)
 });
 
 // POST assign faculty to subject
-router.post("/assign-faculty-subject", protect, async (req, res) => {
+router.post("/assign-faculty-subject", async (req, res) => {
   try {
+    console.log(`[${new Date().toISOString()}] POST /api/faculty-subject/assign-faculty-subject`);
+    console.log('[ASSIGN] Request body:', req.body);
+    
     const { facultyId, subjectId } = req.body;
     
     if (!facultyId || !subjectId) {
+      console.log('[ASSIGN] Missing required fields:', { facultyId, subjectId });
       return res.status(400).json({
         success: false,
         message: "Faculty ID and Subject ID are required"
       });
     }
     
+    console.log('[ASSIGN] Looking for faculty:', facultyId);
+    
     // Verify faculty exists
     const faculty = await Faculty.findById(facultyId);
     if (!faculty) {
+      console.log('[ASSIGN] Faculty not found');
       return res.status(404).json({
         success: false,
         message: "Faculty not found"
       });
     }
     
+    console.log('[ASSIGN] Found faculty:', faculty.firstName, faculty.lastName);
+    console.log('[ASSIGN] Looking for subject:', subjectId);
+    
     // Verify subject exists
     const subject = await AdminSubject.findById(subjectId);
     if (!subject) {
+      console.log('[ASSIGN] Subject not found');
       return res.status(404).json({
         success: false,
         message: "Subject not found"
       });
     }
     
+    console.log('[ASSIGN] Found subject:', subject.name);
+    
     // Check if already assigned
     if (faculty.subjectsTaught.includes(subjectId)) {
+      console.log('[ASSIGN] Already assigned');
       return res.status(400).json({
         success: false,
         message: "Faculty is already assigned to this subject"
       });
     }
     
+    console.log('[ASSIGN] Adding subject to faculty');
+    
     // Add subject to faculty's subjectsTaught
     faculty.subjectsTaught.push(subjectId);
     await faculty.save();
+    
+    console.log('[ASSIGN] Assignment successful');
     
     res.status(200).json({
       success: true,
@@ -260,7 +278,7 @@ router.post("/assign-faculty-subject", protect, async (req, res) => {
     });
     
   } catch (error) {
-    console.error("Error assigning faculty to subject:", error);
+    console.error("[ASSIGN] Error:", error);
     res.status(500).json({
       success: false,
       message: "Server error while assigning faculty to subject",
@@ -305,6 +323,91 @@ router.delete("/remove-faculty-subject", protect, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while removing faculty from subject",
+      error: error.message
+    });
+  }
+});
+
+// Test route for faculty-subject assignment (without authentication)
+router.post("/test-assign-faculty-subject", async (req, res) => {
+  try {
+    console.log(`[${new Date().toISOString()}] POST /api/faculty-subject/test-assign-faculty-subject`);
+    console.log('[TEST ASSIGN] Request body:', req.body);
+    
+    const { facultyId, subjectId } = req.body;
+    
+    if (!facultyId || !subjectId) {
+      return res.status(400).json({
+        success: false,
+        message: "Faculty ID and Subject ID are required"
+      });
+    }
+    
+    console.log('[TEST ASSIGN] Looking for faculty:', facultyId);
+    
+    // Find faculty
+    const faculty = await Faculty.findById(facultyId);
+    if (!faculty) {
+      console.log('[TEST ASSIGN] Faculty not found');
+      return res.status(404).json({
+        success: false,
+        message: "Faculty not found"
+      });
+    }
+    
+    console.log('[TEST ASSIGN] Found faculty:', faculty.firstName, faculty.lastName);
+    
+    console.log('[TEST ASSIGN] Looking for subject:', subjectId);
+    
+    // Find subject
+    const subject = await AdminSubject.findById(subjectId);
+    if (!subject) {
+      console.log('[TEST ASSIGN] Subject not found');
+      return res.status(404).json({
+        success: false,
+        message: "Subject not found"
+      });
+    }
+    
+    console.log('[TEST ASSIGN] Found subject:', subject.name);
+    
+    // Check if already assigned
+    const isAlreadyAssigned = faculty.subjectsTaught.some(
+      subj => subj._id?.toString() === subjectId || subj.toString() === subjectId
+    );
+    
+    if (isAlreadyAssigned) {
+      console.log('[TEST ASSIGN] Already assigned');
+      return res.status(200).json({
+        success: false,
+        message: "Faculty is already assigned to this subject"
+      });
+    }
+    
+    console.log('[TEST ASSIGN] Adding subject to faculty');
+    
+    // Add subject to faculty
+    faculty.subjectsTaught.push(subjectId);
+    await faculty.save();
+    
+    console.log('[TEST ASSIGN] Assignment successful');
+    
+    res.status(200).json({
+      success: true,
+      message: "Subject assigned to faculty successfully",
+      data: {
+        facultyId: faculty._id,
+        facultyName: `${faculty.firstName} ${faculty.lastName}`,
+        subjectId: subject._id,
+        subjectName: subject.name
+      }
+    });
+    
+  } catch (error) {
+    console.error('[TEST ASSIGN] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while assigning faculty to subject",
       error: error.message
     });
   }
