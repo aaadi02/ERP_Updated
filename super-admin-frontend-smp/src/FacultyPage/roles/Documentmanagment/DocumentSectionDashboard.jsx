@@ -136,12 +136,35 @@ const DocumentManagementDashboard = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    if (!firstName.trim()) newErrors.firstName = "First Name is required";
-    if (!lastName.trim()) newErrors.lastName = "Last Name is required";
-    if (!enrollmentNumber.trim())
-      newErrors.enrollmentNumber = "Enrollment Number is required";
-    else if (!/^[0-9]+$/.test(enrollmentNumber))
+    
+    // Check if enrollment number is provided
+    const hasEnrollment = enrollmentNumber.trim();
+    
+    // Check if both first and last names are provided
+    const hasFirstName = firstName.trim();
+    const hasLastName = lastName.trim();
+    const hasBothNames = hasFirstName && hasLastName;
+    
+    // Validation: Either enrollment number OR both names must be provided
+    if (!hasEnrollment && !hasBothNames) {
+      if (!hasFirstName) {
+        newErrors.firstName = "First Name is required when Enrollment Number is not provided";
+      }
+      if (!hasLastName) {
+        newErrors.lastName = "Last Name is required when Enrollment Number is not provided";
+      }
+      if (!hasEnrollment) {
+        newErrors.enrollmentNumber = "Enrollment Number is required when First Name and Last Name are not provided";
+      }
+      // Add a general error message
+      newErrors.general = "Please provide either: (First Name + Last Name) OR Enrollment Number";
+    }
+    
+    // Validate enrollment number format if provided
+    if (hasEnrollment && !/^[0-9]+$/.test(enrollmentNumber)) {
       newErrors.enrollmentNumber = "Enrollment Number must be numeric";
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -149,19 +172,33 @@ const DocumentManagementDashboard = () => {
   const fetchStudentData = async () => {
     setIsLoading(true);
     setErrors({});
+    
     try {
+      // Prepare search parameters based on what's provided
+      const params = {};
+      
+      if (enrollmentNumber.trim()) {
+        // Search by enrollment number only
+        params.enrollmentNumber = enrollmentNumber.trim();
+      } else if (firstName.trim() && lastName.trim()) {
+        // Search by first name and last name
+        params.firstName = firstName.trim();
+        params.lastName = lastName.trim();
+      }
+      
+      console.log('🔍 Searching with params:', params);
+      
       const res = await axios.get("http://localhost:5000/api/students", {
-        params: {
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
-          enrollmentNumber: enrollmentNumber.trim(),
-        },
+        params,
         headers: { Authorization: `Bearer ${token}` },
       });
+      
       if (res.data && res.data.length > 0) {
         setStudentData(res.data[0]);
+        console.log('✅ Student found:', res.data[0]);
       } else {
-        setErrors({ api: "No student found with the provided details" });
+        const searchMethod = enrollmentNumber.trim() ? 'enrollment number' : 'first and last name';
+        setErrors({ api: `No student found with the provided ${searchMethod}` });
         setStudentData(null);
       }
     } catch (err) {
@@ -246,6 +283,7 @@ const DocumentManagementDashboard = () => {
       alert("Invalid student ID. Please fetch student data again.");
       return;
     }
+    
     let certificateData;
     try {
       certificateData = {
@@ -269,24 +307,26 @@ const DocumentManagementDashboard = () => {
         conduct: "good moral character",
         dateOfIssue: new Date().toLocaleDateString("en-GB"),
       };
-      await axios.post(
-        `http://localhost:5000/api/students/generate-certificate/${studentData._id}`,
-        {
-          type: "BC",
-          data: certificateData,
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-    } catch (err) {
-      setErrors({
-        api: `Failed to generate BC certificate: ${
-          err.response?.data?.error || err.message
-        }`,
-      });
-    }
-    try {
+      
+      // First try to register the certificate with the backend
+      try {
+        await axios.post(
+          `http://localhost:5000/api/students/generate-certificate/${studentData._id}`,
+          {
+            type: "BC",
+            data: certificateData,
+          },
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        console.log('✅ Certificate registered with backend successfully');
+      } catch (apiErr) {
+        console.warn('⚠️ Backend certificate registration failed:', apiErr.response?.data?.error || apiErr.message);
+        // Continue with PDF generation even if backend fails
+      }
+
+      // Generate PDF certificate
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       const marginLeft = 20;
       const marginRight = 20;
@@ -339,6 +379,8 @@ const DocumentManagementDashboard = () => {
       doc.setFontSize(14);
       doc.text("BONAFIDE CERTIFICATE", pageWidth / 2, y + 7, { align: "center" });
       y += 20;
+      
+      // Certificate content with bold formatting for important details
       doc.setFont("helvetica", "normal");
       doc.setFontSize(12);
       const gender = studentData?.gender || "Male";
@@ -346,26 +388,78 @@ const DocumentManagementDashboard = () => {
       const heShe = isFemalePronoun ? "she" : "he";
       const hisHer = isFemalePronoun ? "her" : "his";
       const studentTitle = isFemalePronoun ? "Ku." : "Shri";
-      const paragraphText = `Certified that ${studentTitle} ${
-        certificateData.studentName
-      } is a bonafide student of this college studying in ${
-        certificateData.course
-      } ${certificateData.year} Year in ${
-        certificateData.semesterNumber
-      } Sem in the session ${certificateData.session}. According to our college record ${hisHer} date of birth is ${
-        certificateData.dateOfBirth
-      }. As far as known to me ${heShe} bears ${certificateData.conduct}.`;
-      const splitText = doc.splitTextToSize(paragraphText, contentWidth);
-      doc.text(splitText, marginLeft, y, {
-        align: "justify",
-        maxWidth: contentWidth,
-        lineHeightFactor: 1.3,
-      });
-      y += splitText.length * 5;
+      
+      // Build the certificate text with proper spacing and formatting
+      const lineHeight = 6;
+      const maxLineWidth = contentWidth - 10; // Leave some margin
+      
+      // Create text segments with bold formatting
+      const textSegments = [
+        { text: "Certified that ", bold: false },
+        { text: `${studentTitle} ${certificateData.studentName}`, bold: true },
+        { text: " is a bonafide student of this college studying in ", bold: false },
+        { text: certificateData.course, bold: true },
+        { text: ` ${certificateData.year} Year in ${certificateData.semesterNumber} Sem in the session `, bold: false },
+        { text: certificateData.session, bold: true },
+        { text: `. According to our college record ${hisHer} date of birth is `, bold: false },
+        { text: certificateData.dateOfBirth, bold: true },
+        { text: `. As far as known to me ${heShe} bears `, bold: false },
+        { text: certificateData.conduct, bold: true },
+        { text: ".", bold: false }
+      ];
+      
+      // Function to render text with proper wrapping
+      let currentX = marginLeft;
+      let currentY = y;
+      
+      for (let segmentIndex = 0; segmentIndex < textSegments.length; segmentIndex++) {
+        const segment = textSegments[segmentIndex];
+        
+        // Set font based on bold property
+        doc.setFont("helvetica", segment.bold ? "bold" : "normal");
+        
+        // Calculate space width with current font
+        const spaceWidth = doc.getTextWidth(' ');
+        
+        // Split text into words to handle wrapping
+        const words = segment.text.split(' ');
+        
+        for (let i = 0; i < words.length; i++) {
+          const word = words[i];
+          const wordWidth = doc.getTextWidth(word);
+          
+          // Check if we need to wrap to next line
+          if (currentX + wordWidth > marginLeft + maxLineWidth && currentX > marginLeft) {
+            currentY += lineHeight;
+            currentX = marginLeft;
+          }
+          
+          // Add the word
+          doc.text(word, currentX, currentY);
+          currentX += wordWidth;
+          
+          // Add space after word (except for last word in segment)
+          if (i < words.length - 1) {
+            currentX += spaceWidth;
+          }
+        }
+        
+        // Add space between segments (except for the last segment)
+        if (segmentIndex < textSegments.length - 1) {
+          // Make sure we use consistent space width for between-segment spacing
+          doc.setFont("helvetica", "normal"); // Use normal font for space calculation
+          const betweenSegmentSpaceWidth = doc.getTextWidth(' ');
+          currentX += betweenSegmentSpaceWidth;
+        }
+      }
+      
+      // Add extra spacing after the main paragraph
+      currentY += lineHeight * 3;
+      
       const currentDate = formatDate(new Date());
-      doc.text(`Date: ${currentDate}`, marginLeft, y + 30);
-      doc.text("Checked by", pageWidth / 2 - 10, y + 30);
-      doc.text("Principal/Vice-Principal", pageWidth - marginRight - 2, y + 30, { align: "right" });
+      doc.text(`Date: ${currentDate}`, marginLeft, currentY + 30);
+      doc.text("Checked by", pageWidth / 2 - 10, currentY + 30);
+      doc.text("Principal/Vice-Principal", pageWidth - marginRight - 2, currentY + 30, { align: "right" });
       doc.save(`BC_${studentData._id}_${Date.now()}.pdf`);
       alert("Bonafide Certificate downloaded successfully!");
     } catch (err) {
@@ -438,18 +532,33 @@ const DocumentManagementDashboard = () => {
 
         {/* Form */}
         <div className="mb-6 sm:mb-8">
+          {/* Instructions */}
+          <div className="text-center mb-6">
+            <p className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
+              Search for a student using either method:
+              <br />
+              <span className="font-semibold text-blue-700">Option 1:</span> Enter both First Name and Last Name
+              <br />
+              <span className="font-semibold text-blue-700">Option 2:</span> Enter Enrollment Number only
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-4">
             <div>
               <label className="block mb-1 sm:mb-2 font-semibold text-indigo-700 text-sm sm:text-base" htmlFor="firstName">
-                First Name *
+                First Name
+                {!enrollmentNumber.trim() && <span className="text-red-500">*</span>}
               </label>
               <input
                 type="text"
                 id="firstName"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
+                disabled={enrollmentNumber.trim() !== ''}
                 className={`w-full p-2 sm:p-3 rounded-lg sm:rounded-xl border-2 focus:outline-none focus:ring-4 transition-all duration-300 ${
-                  errors.firstName ? "border-red-400 ring-red-100" : "border-indigo-300 focus:ring-indigo-200"
+                  enrollmentNumber.trim() !== '' 
+                    ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed' 
+                    : errors.firstName ? "border-red-400 ring-red-100" : "border-indigo-300 focus:ring-indigo-200"
                 } bg-white/80 text-sm sm:text-base`}
                 placeholder="Enter first name"
               />
@@ -459,15 +568,19 @@ const DocumentManagementDashboard = () => {
             </div>
             <div>
               <label className="block mb-1 sm:mb-2 font-semibold text-indigo-700 text-sm sm:text-base" htmlFor="lastName">
-                Last Name *
+                Last Name
+                {!enrollmentNumber.trim() && <span className="text-red-500">*</span>}
               </label>
               <input
                 type="text"
                 id="lastName"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
+                disabled={enrollmentNumber.trim() !== ''}
                 className={`w-full p-2 sm:p-3 rounded-lg sm:rounded-xl border-2 focus:outline-none focus:ring-4 transition-all duration-300 ${
-                  errors.lastName ? "border-red-400 ring-red-100" : "border-indigo-300 focus:ring-indigo-200"
+                  enrollmentNumber.trim() !== '' 
+                    ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed' 
+                    : errors.lastName ? "border-red-400 ring-red-100" : "border-indigo-300 focus:ring-indigo-200"
                 } bg-white/80 text-sm sm:text-base`}
                 placeholder="Enter last name"
               />
@@ -476,17 +589,26 @@ const DocumentManagementDashboard = () => {
               )}
             </div>
           </div>
+
+          <div className="text-center mb-4">
+            <span className="text-gray-500 font-medium">OR</span>
+          </div>
+
           <div className="mb-4">
             <label className="block mb-1 sm:mb-2 font-semibold text-indigo-700 text-sm sm:text-base" htmlFor="enrollment">
-              Enrollment Number *
+              Enrollment Number
+              {!firstName.trim() && !lastName.trim() && <span className="text-red-500">*</span>}
             </label>
             <input
               type="text"
               id="enrollment"
               value={enrollmentNumber}
               onChange={(e) => setEnrollmentNumber(e.target.value)}
+              disabled={firstName.trim() !== '' || lastName.trim() !== ''}
               className={`w-full p-2 sm:p-3 rounded-lg sm:rounded-xl border-2 focus:outline-none focus:ring-4 transition-all duration-300 ${
-                errors.enrollmentNumber ? "border-red-400 ring-red-100" : "border-indigo-300 focus:ring-indigo-200"
+                firstName.trim() !== '' || lastName.trim() !== '' 
+                  ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed' 
+                  : errors.enrollmentNumber ? "border-red-400 ring-red-100" : "border-indigo-300 focus:ring-indigo-200"
               } bg-white/80 text-sm sm:text-base`}
               placeholder="Enter enrollment number"
             />
@@ -505,14 +627,14 @@ const DocumentManagementDashboard = () => {
                   : "bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
               } text-white text-sm sm:text-base`}
             >
-              {isLoading ? "Fetching..." : "Fetch Student Data"}
+              {isLoading ? "Searching..." : "Search Student"}
             </button>
             <button
               type="button"
               onClick={handleReset}
               className="flex-1 p-2 sm:p-3 rounded-lg sm:rounded-xl font-semibold shadow-md bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600 text-white text-sm sm:text-base"
             >
-              Reset
+              Clear
             </button>
           </div>
         </div>

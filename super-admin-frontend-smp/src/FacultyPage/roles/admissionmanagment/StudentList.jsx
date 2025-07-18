@@ -343,6 +343,9 @@ function StudentList() {
     progress: "Satisfactory",
     conduct: "Good",
     remarks: "",
+    remarkSemester: "",
+    remarkSession: "",
+    remarkYear: "",
     completionStatus: "",
     standard: "",
     error: null,
@@ -485,6 +488,9 @@ function StudentList() {
         progress: "Satisfactory",
         conduct: "Good",
         remarks: "",
+        remarkSemester: "",
+        remarkSession: "",
+        remarkYear: "",
       });
     } catch (err) {
       alert("Error fetching student data: " + (err.response?.data?.error || err.message));
@@ -508,6 +514,9 @@ function StudentList() {
       progress: "Satisfactory",
       conduct: "Good",
       remarks: "",
+      remarkSemester: "",
+      remarkSession: "",
+      remarkYear: "",
     });
   };
 
@@ -537,7 +546,7 @@ function StudentList() {
   };
 
   const handleGenerateCertificate = async () => {
-    const { studentId, type, reason, leavingDate, isCleared, completionStatus, progress, conduct, remarks, standard } =
+    const { studentId, type, reason, leavingDate, isCleared, completionStatus, progress, conduct, remarks, remarkSemester, remarkSession, remarkYear, standard } =
       certificateModal;
 
     if (!reason.trim()) {
@@ -661,9 +670,19 @@ function StudentList() {
       doc.setFontSize(12);
       const lineHeightPerLine = 6;
 
-      const fullRemarks = remarks && standard
-        ? `${remarks} in ${standard} examination conducted by RTMNU, Nagpur`
-        : remarks || "No dues cleared";
+      // Create detailed remark based on selected values
+      let fullRemarks = "";
+      if (remarks && remarkSemester && remarkSession && remarkYear) {
+        const semesterWord = remarkSemester === "1" ? "1st" : remarkSemester === "2" ? "2nd" : remarkSemester === "3" ? "3rd" : `${remarkSemester}th`;
+        const departmentName = student.department?.name || "Engineering";
+        fullRemarks = `${remarks} in ${standard} ${semesterWord} semester ${departmentName} examination conducted by RTMNU, Nagpur held in ${remarkSession}-${remarkYear}`;
+      } else if (remarks && standard) {
+        fullRemarks = `${remarks} in ${standard} examination conducted by RTMNU, Nagpur`;
+      } else if (remarks) {
+        fullRemarks = remarks;
+      } else {
+        fullRemarks = "No dues cleared";
+      }
 
       const fields = [
         {
@@ -1400,10 +1419,14 @@ initial={{ scale: 0.9, y: 20 }}
                         {
                           label: "Reason for Leaving",
                           id: "reason",
-                          type: "text",
+                          type: "select",
                           name: "reason",
-                          placeholder: "Label, reason for leaving",
                           value: certificateModal.reason,
+                          options: [
+                            { value: "", label: "Select Reason" },
+                            { value: "term completion", label: "Term Completion" },
+                            { value: "own request", label: "Own Request" },
+                          ],
                         },
                         {
                           label: "Leaving Date",
@@ -1442,9 +1465,63 @@ initial={{ scale: 0.9, y: 20 }}
                           value: certificateModal.remarks,
                           options: [
                             { value: "", label: "Select Remark" },
-                            { value: "He/she has failed", label: "He/she has failed" },
-                            { value: "He/she has successfully completed", label: "He/she has completed" },
-                            { value: "He/she has not appeared", label: "He/she has not appeared" },
+                            { value: "He has failed", label: "He has failed" },
+                            { value: "She has failed", label: "She has failed" },
+                            { value: "He has completed", label: "He has completed" },
+                            { value: "She has completed", label: "She has completed" },
+                            { value: "He has not appeared", label: "He has not appeared" },
+                            { value: "She has not appeared", label: "She has not appeared" },
+                          ],
+                        },
+                        {
+                          label: "Semester",
+                          id: "remarkSemester",
+                          type: "select",
+                          name: "remarkSemester",
+                          value: certificateModal.remarkSemester,
+                          options: [
+                            { value: "", label: "Select Semester" },
+                            { value: "1", label: "1st Semester" },
+                            { value: "2", label: "2nd Semester" },
+                            { value: "3", label: "3rd Semester" },
+                            { value: "4", label: "4th Semester" },
+                            { value: "5", label: "5th Semester" },
+                            { value: "6", label: "6th Semester" },
+                            { value: "7", label: "7th Semester" },
+                            { value: "8", label: "8th Semester" },
+                          ],
+                        },
+                        {
+                          label: "Examination Session",
+                          id: "remarkSession",
+                          type: "select",
+                          name: "remarkSession",
+                          value: certificateModal.remarkSession,
+                          options: [
+                            { value: "", label: "Select Session" },
+                            { value: "Winter", label: "Winter" },
+                            { value: "Summer", label: "Summer" },
+                          ],
+                        },
+                        {
+                          label: "Examination Year",
+                          id: "remarkYear",
+                          type: "select",
+                          name: "remarkYear",
+                          value: certificateModal.remarkYear,
+                          options: [
+                            { value: "", label: "Select Year" },
+                            { value: "2020", label: "2020" },
+                            { value: "2021", label: "2021" },
+                            { value: "2022", label: "2022" },
+                            { value: "2023", label: "2023" },
+                            { value: "2024", label: "2024" },
+                            { value: "2025", label: "2025" },
+                            { value: "2026", label: "2026" },
+                            { value: "2027", label: "2027" },
+                            { value: "2028", label: "2028" },
+                            { value: "2029", label: "2029" },
+                            { value: "2030", label: "2030" },
                           ],
                         },
                         {
