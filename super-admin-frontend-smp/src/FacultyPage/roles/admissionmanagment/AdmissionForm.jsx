@@ -6,7 +6,7 @@ import { Sun, Moon } from "lucide-react";
 function AdmissionForm() {
   const [theme, setTheme] = useState("light");
   const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
-  
+
   // Theme classes based on user's specification
   const themeClasses = {
     dark: {
@@ -48,9 +48,9 @@ function AdmissionForm() {
       checkboxText: "text-gray-700",
     },
   };
-  
+
   const currentTheme = themeClasses[theme];
-  
+
   const [castes, setCastes] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const location = useLocation();
@@ -101,43 +101,48 @@ function AdmissionForm() {
 
   useEffect(() => {
     if (location?.state) {
+      const state = location.state;
       setFormData({
-        firstName: location.state.firstName || "",
-        middleName: location.state.middleName || "",
-        lastName: location.state.lastName || "",
-        fatherName: location.state.fatherName || "",
-        unicodeFatherName: location.state.unicodeFatherName || "",
-        motherName: location.state.motherName || "",
-        unicodeMotherName: location.state.unicodeMotherName || "",
-        unicodeName: location.state.unicodeName || "",
-        enrollmentNumber: location.state.enrollmentNumber || "",
-        mobileNumber: location.state.mobileNumber || "",
-        email: location.state.email || "",
-        section: location.state.section || "",
-        remark: location.state.remark || "",
-        nationality: location.state.nationality || "",
-        placeOfBirth: location.state.placeOfBirth || "",
-        dateOfBirth: location.state.dateOfBirth
-          ? new Date(location.state.dateOfBirth).toISOString().split("T")[0]
+        firstName: state.firstName || "",
+        middleName: state.middleName || "",
+        lastName: state.lastName || "",
+        fatherName: state.fatherName || "",
+        unicodeFatherName: state.unicodeFatherName || "",
+        motherName: state.motherName || "",
+        unicodeMotherName: state.unicodeMotherName || "",
+        unicodeName: state.unicodeName || "",
+        enrollmentNumber: state.enrollmentNumber || "",
+        mobileNumber: state.mobileNumber || "",
+        email: state.email || "",
+        section: state.section || "",
+        remark: state.remark || "",
+        nationality: state.nationality || "",
+        placeOfBirth: state.placeOfBirth || "",
+        dateOfBirth: state.dateOfBirth
+          ? new Date(state.dateOfBirth).toISOString().split("T")[0]
           : "",
-        schoolAttended: location.state.schoolAttended || "",
-        nameOfInstitute: location.state.nameOfInstitute || "",
-        stream: location.state.stream?._id || "",
-        department: location.state.department?._id || "",
-        semester: location.state.semester?._id || "",
-        subjects: location.state.subjects?.map((sub) => sub._id) || [],
-        gender: location.state.gender || "",
-        casteCategory: location.state.casteCategory || "",
-        subCaste: location.state.subCaste || "",
-        admissionType: location.state.admissionType || "",
-        admissionThrough: location.state.admissionThrough || "",
-        address: location.state.address || "",
-        guardianNumber: location.state.guardianNumber || "",
+        schoolAttended: state.schoolAttended || "",
+        nameOfInstitute: state.nameOfInstitute || "",
+        stream: state.stream?._id || state.stream || "",
+        department: state.department?._id || state.department || "",
+        semester: state.semester?._id || state.semester || "",
+        subjects: Array.isArray(state.subjects)
+          ? state.subjects
+              .map((sub) => (typeof sub === "object" ? sub._id : sub))
+              .filter(Boolean)
+          : [],
+        gender: state.gender || "",
+        casteCategory: state.casteCategory || "",
+        subCaste: state.subCaste || "",
+        admissionType: state.admissionType || "",
+        admissionThrough: state.admissionThrough || "",
+        address: state.address || "",
+        guardianNumber: state.guardianNumber || "",
         photo: null,
-        abcId: location.state.abcId || "",
+        abcId: state.abcId || "",
       });
-      setEditingId(location.state._id);
-      setPhotoPreview(location.state.photo || null);
+      setEditingId(state._id);
+      setPhotoPreview(state.photo || null);
     }
   }, [location?.state]);
 
@@ -145,11 +150,22 @@ function AdmissionForm() {
     const fetchCastes = async () => {
       setLoadingCastes(true);
       try {
+        const token =
+          localStorage.getItem("token") ||
+          localStorage.getItem("facultyToken") ||
+          localStorage.getItem("authToken") ||
+          localStorage.getItem("superAdminToken");
+
+        if (!token) {
+          setFetchError("Authentication required. Please log in again.");
+          return;
+        }
+
         const res = await axios.get(
           "http://localhost:5000/api/superadmin/castes",
           {
             headers: {
-              Authorization: `Bearer ${localStorage.getItem("facultyToken")}`,
+              Authorization: `Bearer ${token}`,
             },
           }
         );
@@ -167,51 +183,74 @@ function AdmissionForm() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const token =
+          localStorage.getItem("token") ||
+          localStorage.getItem("facultyToken") ||
+          localStorage.getItem("authToken") ||
+          localStorage.getItem("superAdminToken");
+
+        if (!token) {
+          setFetchError("Authentication required. Please log in again.");
+          return;
+        }
+
         const [streamRes, departmentRes, semesterRes, subjectRes] =
           await Promise.all([
             axios.get("http://localhost:5000/api/streams", {
               headers: {
-                Authorization: `Bearer ${localStorage.getItem("facultyToken")}`,
+                Authorization: `Bearer ${token}`,
               },
             }),
             axios.get("http://localhost:5000/api/superadmin/departments", {
               headers: {
-                Authorization: `Bearer ${localStorage.getItem("facultyToken")}`,
+                Authorization: `Bearer ${token}`,
               },
             }),
             axios.get("http://localhost:5000/api/superadmin/semesters", {
               headers: {
-                Authorization: `Bearer ${localStorage.getItem("facultyToken")}`,
+                Authorization: `Bearer ${token}`,
               },
             }),
             axios.get("http://localhost:5000/api/superadmin/subjects", {
               headers: {
-                Authorization: `Bearer ${localStorage.getItem("facultyToken")}`,
+                Authorization: `Bearer ${token}`,
               },
             }),
           ]);
 
-        const streamsData = streamRes.data || [];
-        const departmentsData = departmentRes.data || [];
-        const semestersData = semesterRes.data || [];
-        const subjectsData = subjectRes.data || [];
+        const streamsData = Array.isArray(streamRes.data) ? streamRes.data : [];
+        const departmentsData = Array.isArray(departmentRes.data)
+          ? departmentRes.data
+          : [];
+        const semestersData = Array.isArray(semesterRes.data)
+          ? semesterRes.data
+          : [];
+        const subjectsData = Array.isArray(subjectRes.data)
+          ? subjectRes.data
+          : [];
 
         setStreams(streamsData);
         setDepartments(departmentsData);
         setSemesters(semestersData);
         setSubjects(subjectsData);
 
-        const combined = streamsData.map((stream) => {
-          const streamDepartments = departmentsData
-            .filter((dept) => dept?.stream?._id === stream._id)
-            .map((dept) => {
-              const deptSubjects = subjectsData.filter(
-                (sub) => sub.department?._id === dept._id
-              );
-              return { ...dept, subjects: deptSubjects };
-            });
-          return { ...stream, departments: streamDepartments };
-        });
+        const combined = streamsData
+          .map((stream) => {
+            if (!stream || !stream._id) return null;
+            const streamDepartments = departmentsData
+              .filter(
+                (dept) => dept && dept.stream && dept.stream._id === stream._id
+              )
+              .map((dept) => {
+                const deptSubjects = subjectsData.filter(
+                  (sub) =>
+                    sub && sub.department && sub.department._id === dept._id
+                );
+                return { ...dept, subjects: deptSubjects };
+              });
+            return { ...stream, departments: streamDepartments };
+          })
+          .filter(Boolean);
 
         setCombinedData(combined);
       } catch (err) {
@@ -225,24 +264,44 @@ function AdmissionForm() {
 
   useEffect(() => {
     const fetchSemesterSubjects = async () => {
-      if (formData.semester && formData.department && typeof formData.semester === "string" && typeof formData.department === "string") {
+      if (
+        formData.semester &&
+        formData.department &&
+        typeof formData.semester === "string" &&
+        typeof formData.department === "string"
+      ) {
         setLoading(true);
         try {
+          const token =
+            localStorage.getItem("token") ||
+            localStorage.getItem("facultyToken") ||
+            localStorage.getItem("authToken") ||
+            localStorage.getItem("superAdminToken");
+
+          if (!token) {
+            setFetchError("Authentication required. Please log in again.");
+            return;
+          }
+
           const res = await axios.get(
             `http://localhost:5000/api/students/subjects/${formData.semester}/${formData.department}`,
             {
               headers: {
-                Authorization: `Bearer ${localStorage.getItem("facultyToken")}`,
+                Authorization: `Bearer ${token}`,
               },
             }
           );
           const fetchedSubjects = res.data || [];
           if (fetchedSubjects.length === 0) {
-            setFetchError("No subjects available for the selected semester and department.");
+            setFetchError(
+              "No subjects available for the selected semester and department."
+            );
           }
           setCombinedData((prev) => {
             const updatedCombined = [...prev];
-            const stream = updatedCombined.find((s) => s._id === formData.stream);
+            const stream = updatedCombined.find(
+              (s) => s._id === formData.stream
+            );
             if (stream) {
               const dept = stream.departments.find(
                 (d) => d._id === formData.department
@@ -281,7 +340,9 @@ function AdmissionForm() {
       setFormData((prev) => ({
         ...prev,
         [name]: value,
-        ...(name === "stream" ? { department: "", semester: "", subjects: [] } : {}),
+        ...(name === "stream"
+          ? { department: "", semester: "", subjects: [] }
+          : {}),
         ...(name === "department" ? { semester: "", subjects: [] } : {}),
         ...(name === "semester" ? { subjects: [] } : {}),
       }));
@@ -327,40 +388,70 @@ function AdmissionForm() {
       "guardianNumber",
       "abcId",
     ];
+
     for (const field of requiredFields) {
-      if (!formData[field]?.trim()) {
-        alert(`Please fill out the ${field.replace(/([A-Z])/g, " $1").toLowerCase()} field.`);
+      const value = formData[field];
+      if (!value || (typeof value === "string" && !value.trim())) {
+        alert(
+          `Please fill out the ${field
+            .replace(/([A-Z])/g, " $1")
+            .toLowerCase()} field.`
+        );
         return false;
       }
     }
-    if (!/^\d{10}$/.test(formData.mobileNumber)) {
+
+    const mobileNumber = String(formData.mobileNumber || "").trim();
+    if (!/^\d{10}$/.test(mobileNumber)) {
       alert("Mobile number must be a 10-digit number.");
       return false;
     }
-    if (!/^\d{10}$/.test(formData.guardianNumber)) {
+
+    const guardianNumber = String(formData.guardianNumber || "").trim();
+    if (!/^\d{10}$/.test(guardianNumber)) {
       alert("Guardian number must be a 10-digit number.");
       return false;
     }
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+
+    const email = String(formData.email || "").trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       alert("Please enter a valid email address.");
       return false;
     }
-    if (!/^\d{12}$/.test(formData.abcId)) {
+
+    const abcId = String(formData.abcId || "").trim();
+    if (!/^\d{12}$/.test(abcId)) {
       alert("ABC ID must be a 12-digit number.");
       return false;
     }
-    if (formData.photo && !["image/jpeg", "image/png"].includes(formData.photo.type)) {
+
+    if (
+      formData.photo &&
+      formData.photo.type &&
+      !["image/jpeg", "image/png"].includes(formData.photo.type)
+    ) {
       alert("Photo must be a JPEG or PNG file.");
       return false;
     }
-    if (formData.photo && formData.photo.size > 2 * 1024 * 1024) {
+
+    if (
+      formData.photo &&
+      formData.photo.size &&
+      formData.photo.size > 2 * 1024 * 1024
+    ) {
       alert("Photo size must not exceed 2MB.");
       return false;
     }
-    if (!editingId && (!formData.subjects || formData.subjects.length === 0)) {
+
+    if (
+      !editingId &&
+      (!Array.isArray(formData.subjects) ||
+        formData.subjects.filter(Boolean).length === 0)
+    ) {
       alert("Please select at least one subject.");
       return false;
     }
+
     return true;
   };
 
@@ -368,19 +459,49 @@ function AdmissionForm() {
     if (!validateForm()) return;
     setLoading(true);
     try {
+      // Check multiple possible token keys, prioritizing the correct one
+      const token =
+        localStorage.getItem("token") ||
+        localStorage.getItem("facultyToken") ||
+        localStorage.getItem("authToken") ||
+        localStorage.getItem("superAdminToken");
+
+      console.log("Available localStorage keys:", Object.keys(localStorage));
+      console.log("Checking for token:", {
+        token: localStorage.getItem("token"),
+        facultyToken: localStorage.getItem("facultyToken"),
+        authToken: localStorage.getItem("authToken"),
+        superAdminToken: localStorage.getItem("superAdminToken"),
+      });
+
+      if (!token) {
+        alert("Authentication required. Please log in again.");
+        navigate("/login");
+        return;
+      }
+
       const formPayload = new FormData();
       Object.entries(formData).forEach(([key, value]) => {
         if (key === "subjects") {
-          value.forEach((subjectId) => formPayload.append("subjects[]", subjectId));
+          if (Array.isArray(value)) {
+            value.filter(Boolean).forEach((subjectId) => {
+              if (subjectId && subjectId.toString().trim()) {
+                formPayload.append("subjects[]", subjectId.toString().trim());
+              }
+            });
+          }
         } else if (key === "photo" && value) {
           formPayload.append(key, value);
-        } else if (value && value !== "") {
-          formPayload.append(key, value);
+        } else if (value !== null && value !== undefined && value !== "") {
+          const stringValue = value.toString().trim();
+          if (stringValue) {
+            formPayload.append(key, stringValue);
+          }
         }
       });
 
       const headers = {
-        Authorization: `Bearer ${localStorage.getItem("facultyToken")}`,
+        Authorization: `Bearer ${token}`,
       };
 
       if (editingId) {
@@ -399,7 +520,19 @@ function AdmissionForm() {
 
       navigate("/dashboard/student-list");
     } catch (err) {
-      alert("Error: " + (err.response?.data?.error || err.message));
+      console.error("Form submission error:", err);
+
+      let errorMessage = "An error occurred while saving the student.";
+
+      if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      alert("Error: " + errorMessage);
     } finally {
       setLoading(false);
     }
@@ -421,7 +554,12 @@ function AdmissionForm() {
     { label: "Remark", name: "remark" },
     { label: "Nationality", name: "nationality", required: true },
     { label: "Place of Birth", name: "placeOfBirth", required: true },
-    { label: "Date of Birth", name: "dateOfBirth", type: "date", required: true },
+    {
+      label: "Date of Birth",
+      name: "dateOfBirth",
+      type: "date",
+      required: true,
+    },
     { label: "School Attended", name: "schoolAttended" },
     { label: "Name of Institute", name: "nameOfInstitute" },
     { label: "Guardian Number", name: "guardianNumber", required: true },
@@ -430,26 +568,33 @@ function AdmissionForm() {
   ];
 
   return (
-    <div className={`min-h-screen ${currentTheme.bg} ${currentTheme.textPrimary} transition-colors duration-500`}>
+    <div
+      className={`min-h-screen ${currentTheme.bg} ${currentTheme.textPrimary} transition-colors duration-500`}
+    >
       {/* Header with theme toggle */}
-      <div className={`${currentTheme.headerBg} py-6 px-4 md:px-8 shadow-xl ${currentTheme.headerBorder}`}>
+      <div
+        className={`${currentTheme.headerBg} py-6 px-4 md:px-8 shadow-xl ${currentTheme.headerBorder}`}
+      >
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-        <h1
-  className={`
+          <h1
+            className={`
     text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight
-    ${theme === 'dark'
-      ? 'text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)]'
-      : 'text-indigo-900 drop-shadow-[0_2px_8px_rgba(99,102,241,0.12)]'
+    ${
+      theme === "dark"
+        ? "text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)]"
+        : "text-indigo-900 drop-shadow-[0_2px_8px_rgba(99,102,241,0.12)]"
     }
     mb-6 transition-all duration-500
   `}
->
-  {editingId ? "Edit Student" : "Student Admission Form"}
-</h1>
+          >
+            {editingId ? "Edit Student" : "Student Admission Form"}
+          </h1>
 
           <button
             onClick={toggleTheme}
-            className={`p-2 rounded-full ${theme === 'dark' ? 'bg-indigo-700' : 'bg-indigo-200'} shadow-lg hover:scale-110 transition-transform`}
+            className={`p-2 rounded-full ${
+              theme === "dark" ? "bg-indigo-700" : "bg-indigo-200"
+            } shadow-lg hover:scale-110 transition-transform`}
           >
             {theme === "dark" ? (
               <Sun className="h-5 w-5 text-yellow-300" />
@@ -461,9 +606,13 @@ function AdmissionForm() {
       </div>
 
       <div className="max-w-4xl mx-auto p-4 md:p-6">
-        <div className={`${currentTheme.cardBg} rounded-2xl shadow-2xl p-6 md:p-8 ${currentTheme.cardBorder} transition-all duration-300 animate-fade-in`}>
+        <div
+          className={`${currentTheme.cardBg} rounded-2xl shadow-2xl p-6 md:p-8 ${currentTheme.cardBorder} transition-all duration-300 animate-fade-in`}
+        >
           {fetchError && (
-            <div className={`mb-6 p-4 rounded-lg flex justify-between items-center animate-fade-in ${currentTheme.errorBg}`}>
+            <div
+              className={`mb-6 p-4 rounded-lg flex justify-between items-center animate-fade-in ${currentTheme.errorBg}`}
+            >
               <span>{fetchError}</span>
               <button
                 onClick={() => setFetchError(null)}
@@ -476,8 +625,14 @@ function AdmissionForm() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {fields.map(({ label, name, type = "text", required }) => (
-              <div key={name} className="mb-4 animate-fade-in-up" style={{ animationDelay: `${fields.indexOf(name)*0.05}s` }}>
-                <label className={`block text-sm font-medium ${currentTheme.textSecondary} mb-1`}>
+              <div
+                key={name}
+                className="mb-4 animate-fade-in-up"
+                style={{ animationDelay: `${fields.indexOf(name) * 0.05}s` }}
+              >
+                <label
+                  className={`block text-sm font-medium ${currentTheme.textSecondary} mb-1`}
+                >
                   {label} {required && <span className="text-red-500">*</span>}
                 </label>
                 {type === "textarea" ? (
@@ -485,7 +640,13 @@ function AdmissionForm() {
                     name={name}
                     value={formData[name] || ""}
                     onChange={handleChange}
-                    className={`w-full p-3 ${currentTheme.cardBorder} rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all ${theme === 'dark' ? 'bg-white/5 text-white' : 'bg-white text-gray-800'}`}
+                    className={`w-full p-3 ${
+                      currentTheme.cardBorder
+                    } rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all ${
+                      theme === "dark"
+                        ? "bg-white/5 text-white"
+                        : "bg-white text-gray-800"
+                    }`}
                     placeholder={`Enter ${label}`}
                     rows={4}
                   />
@@ -495,7 +656,13 @@ function AdmissionForm() {
                     name={name}
                     value={formData[name] || ""}
                     onChange={handleChange}
-                    className={`w-full p-3 ${currentTheme.cardBorder} rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all ${theme === 'dark' ? 'bg-white/5 text-white' : 'bg-white text-gray-800'}`}
+                    className={`w-full p-3 ${
+                      currentTheme.cardBorder
+                    } rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all ${
+                      theme === "dark"
+                        ? "bg-white/5 text-white"
+                        : "bg-white text-gray-800"
+                    }`}
                     placeholder={`Enter ${label}`}
                     required={required}
                   />
@@ -505,7 +672,9 @@ function AdmissionForm() {
 
             {/* Photo Upload */}
             <div className="mb-4 animate-fade-in-up">
-              <label className={`block text-sm font-medium ${currentTheme.textSecondary} mb-1`}>
+              <label
+                className={`block text-sm font-medium ${currentTheme.textSecondary} mb-1`}
+              >
                 Photo {editingId && <span>(Leave empty to keep existing)</span>}
               </label>
               <div className="relative group">
@@ -516,12 +685,28 @@ function AdmissionForm() {
                   onChange={handleChange}
                   className="w-full p-3 opacity-0 absolute inset-0 cursor-pointer"
                 />
-                <div className={`p-3 ${currentTheme.cardBorder} rounded-xl group-hover:bg-indigo-500/10 transition-all ${theme === 'dark' ? 'bg-white/5' : 'bg-white'}`}>
+                <div
+                  className={`p-3 ${
+                    currentTheme.cardBorder
+                  } rounded-xl group-hover:bg-indigo-500/10 transition-all ${
+                    theme === "dark" ? "bg-white/5" : "bg-white"
+                  }`}
+                >
                   <div className="flex items-center justify-between">
-                    <span className={`${theme === 'dark' ? 'text-indigo-200' : 'text-indigo-700'}`}>
+                    <span
+                      className={`${
+                        theme === "dark" ? "text-indigo-200" : "text-indigo-700"
+                      }`}
+                    >
                       {formData.photo ? formData.photo.name : "Choose photo"}
                     </span>
-                    <span className={`px-2 py-1 ${theme === 'dark' ? 'bg-indigo-500/30 text-indigo-200' : 'bg-indigo-500/20 text-indigo-700'} rounded-md text-xs`}>
+                    <span
+                      className={`px-2 py-1 ${
+                        theme === "dark"
+                          ? "bg-indigo-500/30 text-indigo-200"
+                          : "bg-indigo-500/20 text-indigo-700"
+                      } rounded-md text-xs`}
+                    >
                       Browse
                     </span>
                   </div>
@@ -551,7 +736,8 @@ function AdmissionForm() {
               label="Department"
               name="department"
               options={
-                combinedData.find((s) => s._id === formData.stream)?.departments || []
+                combinedData.find((s) => s._id === formData.stream)
+                  ?.departments || []
               }
               required
               theme={theme}
@@ -562,7 +748,7 @@ function AdmissionForm() {
               name="semester"
               options={semesters.map((s) => ({
                 _id: s._id,
-                name: `Semester ${s.number}`,
+                name: `Semester ${s.number || s.name || "Unknown"}`,
               }))}
               required
               theme={theme}
@@ -571,16 +757,30 @@ function AdmissionForm() {
 
             {/* Subjects Checkbox Group */}
             <div className="mb-4 md:col-span-2 animate-fade-in-up">
-              <label className={`block text-sm font-medium ${currentTheme.textSecondary} mb-1`}>
+              <label
+                className={`block text-sm font-medium ${currentTheme.textSecondary} mb-1`}
+              >
                 Subjects <span className="text-red-500">*</span>
               </label>
-              <div className={`p-4 ${currentTheme.cardBorder} rounded-xl ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'} max-h-[12rem] overflow-y-auto transition-all`}>
+              <div
+                className={`p-4 ${currentTheme.cardBorder} rounded-xl ${
+                  theme === "dark" ? "bg-gray-800" : "bg-gray-50"
+                } max-h-[12rem] overflow-y-auto transition-all`}
+              >
                 {loading ? (
                   <div className="flex items-center justify-center h-20">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                    <span className={`ml-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Loading subjects...</span>
+                    <span
+                      className={`ml-2 ${
+                        theme === "dark" ? "text-gray-300" : "text-gray-600"
+                      }`}
+                    >
+                      Loading subjects...
+                    </span>
                   </div>
-                ) : formData.stream && formData.department && formData.semester ? (
+                ) : formData.stream &&
+                  formData.department &&
+                  formData.semester ? (
                   (
                     combinedData
                       .find((s) => s._id === formData.stream)
@@ -607,7 +807,11 @@ function AdmissionForm() {
                           />
                           <label
                             htmlFor={`subject-${sub._id}`}
-                            className={`ml-2 ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}
+                            className={`ml-2 ${
+                              theme === "dark"
+                                ? "text-gray-200"
+                                : "text-gray-700"
+                            }`}
                           >
                             {sub.name}
                           </label>
@@ -615,12 +819,18 @@ function AdmissionForm() {
                       ))
                   ) : (
                     <div className="text-red-400 py-2">
-                      No subjects available for this semester and department. Please select a different combination.
+                      No subjects available for this semester and department.
+                      Please select a different combination.
                     </div>
                   )
                 ) : (
-                  <div className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} py-2`}>
-                    Please select stream, department, and semester to view subjects.
+                  <div
+                    className={`${
+                      theme === "dark" ? "text-gray-400" : "text-gray-500"
+                    } py-2`}
+                  >
+                    Please select stream, department, and semester to view
+                    subjects.
                   </div>
                 )}
               </div>
@@ -628,14 +838,22 @@ function AdmissionForm() {
 
             {/* Gender, Caste, Admission Fields */}
             <div className="mb-4 animate-fade-in-up">
-              <label className={`block text-sm font-medium ${currentTheme.textSecondary} mb-1`}>
+              <label
+                className={`block text-sm font-medium ${currentTheme.textSecondary} mb-1`}
+              >
                 Gender <span className="text-red-500">*</span>
               </label>
               <select
                 name="gender"
                 value={formData.gender || ""}
                 onChange={handleChange}
-                className={`w-full p-3 ${currentTheme.cardBorder} rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all ${theme === 'dark' ? 'bg-white/5 text-black' : 'bg-white text-gray-800'}`}
+                className={`w-full p-3 ${
+                  currentTheme.cardBorder
+                } rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all ${
+                  theme === "dark"
+                    ? "bg-white/5 text-black"
+                    : "bg-white text-gray-800"
+                }`}
                 required
               >
                 <option value="">Select Gender</option>
@@ -646,7 +864,9 @@ function AdmissionForm() {
             </div>
 
             <div className="mb-4 animate-fade-in-up">
-              <label className={`block text-sm font-medium ${currentTheme.textSecondary} mb-1`}>
+              <label
+                className={`block text-sm font-medium ${currentTheme.textSecondary} mb-1`}
+              >
                 Caste Category <span className="text-red-500">*</span>
               </label>
               <select
@@ -654,7 +874,13 @@ function AdmissionForm() {
                 value={formData.casteCategory || ""}
                 onChange={handleCasteChange}
                 disabled={loadingCastes}
-                className={`w-full p-3 ${currentTheme.cardBorder} rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all ${theme === 'dark' ? 'bg-white/5 text-black' : 'bg-white text-gray-800'}`}
+                className={`w-full p-3 ${
+                  currentTheme.cardBorder
+                } rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all ${
+                  theme === "dark"
+                    ? "bg-white/5 text-black"
+                    : "bg-white text-gray-800"
+                }`}
                 required
               >
                 <option value="">Select Caste</option>
@@ -667,14 +893,22 @@ function AdmissionForm() {
             </div>
 
             <div className="mb-4 animate-fade-in-up">
-              <label className={`block text-sm font-medium ${currentTheme.textSecondary} mb-1`}>
+              <label
+                className={`block text-sm font-medium ${currentTheme.textSecondary} mb-1`}
+              >
                 Sub Caste
               </label>
               <select
                 name="subCaste"
                 value={formData.subCaste || ""}
                 onChange={handleChange}
-                className={`w-full p-3 ${currentTheme.cardBorder} rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all ${theme === 'dark' ? 'bg-white/5 text-black' : 'bg-white text-gray-800'}`}
+                className={`w-full p-3 ${
+                  currentTheme.cardBorder
+                } rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all ${
+                  theme === "dark"
+                    ? "bg-white/5 text-black"
+                    : "bg-white text-gray-800"
+                }`}
               >
                 <option value="">Select Subcaste</option>
                 {subcastes.map((sub, i) => (
@@ -686,14 +920,22 @@ function AdmissionForm() {
             </div>
 
             <div className="mb-4 animate-fade-in-up">
-              <label className={`block text-sm font-medium ${currentTheme.textSecondary} mb-1`}>
+              <label
+                className={`block text-sm font-medium ${currentTheme.textSecondary} mb-1`}
+              >
                 Admission Type <span className="text-red-500">*</span>
               </label>
               <select
                 name="admissionType"
                 value={formData.admissionType || ""}
                 onChange={handleChange}
-                className={`w-full p-3 ${currentTheme.cardBorder} rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all ${theme === 'dark' ? 'bg-white/5 text-black' : 'bg-white text-gray-800'}`}
+                className={`w-full p-3 ${
+                  currentTheme.cardBorder
+                } rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all ${
+                  theme === "dark"
+                    ? "bg-white/5 text-black"
+                    : "bg-white text-gray-800"
+                }`}
                 required
               >
                 <option value="">Select Admission Type</option>
@@ -704,14 +946,22 @@ function AdmissionForm() {
             </div>
 
             <div className="mb-4 animate-fade-in-up">
-              <label className={`block text-sm font-medium ${currentTheme.textSecondary} mb-1`}>
+              <label
+                className={`block text-sm font-medium ${currentTheme.textSecondary} mb-1`}
+              >
                 Admission Through
               </label>
               <select
                 name="admissionThrough"
                 value={formData.admissionThrough || ""}
                 onChange={handleChange}
-                className={`w-full p-3 ${currentTheme.cardBorder} rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all ${theme === 'dark' ? 'bg-white/5 text-black' : 'bg-white text-gray-800'}`}
+                className={`w-full p-3 ${
+                  currentTheme.cardBorder
+                } rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all ${
+                  theme === "dark"
+                    ? "bg-white/5 text-black"
+                    : "bg-white text-gray-800"
+                }`}
               >
                 <option value="">Select</option>
                 <option value="Entrance Exam">Entrance Exam</option>
@@ -787,10 +1037,19 @@ function AdmissionForm() {
   );
 
   // Updated DropdownGroup component with theme styles
-  function DropdownGroup({ label, name, options, required = false, theme, themeClasses }) {
+  function DropdownGroup({
+    label,
+    name,
+    options,
+    required = false,
+    theme,
+    themeClasses,
+  }) {
     return (
       <div className="mb-4 animate-fade-in-up">
-        <label className={`block text-sm font-medium ${themeClasses.textSecondary} mb-1`}>
+        <label
+          className={`block text-sm font-medium ${themeClasses.textSecondary} mb-1`}
+        >
           {label} {required && <span className="text-red-500">*</span>}
         </label>
         <div className="relative">
@@ -798,7 +1057,13 @@ function AdmissionForm() {
             name={name}
             value={formData[name] || ""}
             onChange={handleChange}
-            className={`w-full p-3 ${themeClasses.cardBorder} rounded-xl appearance-none focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all ${theme === 'dark' ? 'bg-white/5 text-black' : 'bg-white text-gray-800'}`}
+            className={`w-full p-3 ${
+              themeClasses.cardBorder
+            } rounded-xl appearance-none focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all ${
+              theme === "dark"
+                ? "bg-white/5 text-black"
+                : "bg-white text-gray-800"
+            }`}
             required={required}
           >
             <option value="">Select {label}</option>
@@ -809,8 +1074,18 @@ function AdmissionForm() {
             ))}
           </select>
           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3">
-            <svg className="h-5 w-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+            <svg
+              className="h-5 w-5 text-indigo-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M19 9l-7 7-7-7"
+              ></path>
             </svg>
           </div>
         </div>
