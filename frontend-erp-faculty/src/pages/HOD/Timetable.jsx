@@ -1,14 +1,25 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
-import { Save, Edit3, Plus, Trash2, Clock, BookOpen, Calendar, Check, X } from "lucide-react";
+import {
+  Save,
+  Edit3,
+  Plus,
+  Trash2,
+  Clock,
+  BookOpen,
+  Calendar,
+  Check,
+  X,
+  RefreshCw,
+} from "lucide-react";
 
 export default function TimetableSimple({ userData }) {
   // Core state - minimal and focused
   const [timetable, setTimetable] = useState({
-    department: '',
-    semester: '',
-    section: '',
-    schedule: [] // Will contain days and time slots
+    department: "",
+    semester: "",
+    section: "",
+    schedule: [], // Will contain days and time slots
   });
 
   const [faculties, setFaculties] = useState([]);
@@ -19,30 +30,45 @@ export default function TimetableSimple({ userData }) {
   const [ccAssignment, setCcAssignment] = useState(null); // Current user's CC assignment
   const [currentTimetableId, setCurrentTimetableId] = useState(null); // Track current timetable ID for deletion
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false); // For refresh functionality
+  const [loadingStatus, setLoadingStatus] = useState(""); // Status messages for loading
+  const [message, setMessage] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [timeSlots, setTimeSlots] = useState([]);
   const [isEditingTimeSlots, setIsEditingTimeSlots] = useState(false);
-  const [newTimeSlot, setNewTimeSlot] = useState({ start: '', end: '', isBreak: false });
+  const [newTimeSlot, setNewTimeSlot] = useState({
+    start: "",
+    end: "",
+    isBreak: false,
+  });
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
 
   // Default structure - simple 6-day week with 6 periods
-  const DEFAULT_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const DEFAULT_DAYS = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
   const DEFAULT_TIME_SLOTS = [
-    '09:00-10:00',
-    '10:00-11:00',
-    '11:15-12:15', // Break after 2nd period
-    '12:15-13:15',
-    '14:00-15:00', // Lunch break
-    '15:00-16:00'
+    "09:00-10:00",
+    "10:00-11:00",
+    "11:15-12:15", // Break after 2nd period
+    "12:15-13:15",
+    "14:00-15:00", // Lunch break
+    "15:00-16:00",
   ];
 
   // Initialize with default time slots
   useEffect(() => {
-    setTimeSlots(DEFAULT_TIME_SLOTS.map(slot => ({
-      timeSlot: slot,
-      isBreak: slot === '11:15-12:15'
-    })));
+    setTimeSlots(
+      DEFAULT_TIME_SLOTS.map((slot) => ({
+        timeSlot: slot,
+        isBreak: slot === "11:15-12:15",
+      }))
+    );
   }, []);
 
   // Initialize userData and fetch CC assignment
@@ -62,59 +88,73 @@ export default function TimetableSimple({ userData }) {
   // Fetch user's CC assignment
   const fetchCCAssignment = async () => {
     setLoading(true);
-    console.log('Starting fetchCCAssignment...');
-    console.log('userData:', userData);
-    console.log('authToken available:', !!localStorage.getItem("authToken"));
+    console.log("Starting fetchCCAssignment...");
+    console.log("userData:", userData);
+    console.log("authToken available:", !!localStorage.getItem("authToken"));
 
     try {
       const token = localStorage.getItem("authToken");
       if (!token) {
-        setMessage('No authentication token found. Please log in.');
+        setMessage("No authentication token found. Please log in.");
         return;
       }
 
-      const response = await axios.get('http://localhost:5000/api/cc/my-cc-assignments', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.get(
+        "http://localhost:5000/api/cc/my-cc-assignments",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
-      console.log('Full API response:', response.data);
+      console.log("Full API response:", response.data);
 
-      if (response.data?.success && response.data.data?.ccAssignments?.length > 0) {
+      if (
+        response.data?.success &&
+        response.data.data?.ccAssignments?.length > 0
+      ) {
         const assignment = response.data.data.ccAssignments[0]; // Use first CC assignment
-        console.log('CC Assignment data received:', assignment);
+        console.log("CC Assignment data received:", assignment);
         setCcAssignment(assignment);
 
         // Auto-fill timetable info from CC assignment
-        setTimetable(prev => ({
+        setTimetable((prev) => ({
           ...prev,
           department: assignment.department,
           semester: assignment.semester,
-          section: assignment.section
+          section: assignment.section,
         }));
 
-        console.log('Timetable state updated with:', {
+        console.log("Timetable state updated with:", {
           department: assignment.department,
           semester: assignment.semester,
-          section: assignment.section
+          section: assignment.section,
         });
 
         // Load department data
         await loadDepartmentData(assignment.department);
-        setMessage(`CC Assignment loaded: ${assignment.department} - Sem ${assignment.semester} - Sec ${assignment.section}`);
+        setMessage(
+          `CC Assignment loaded: ${assignment.department} - Sem ${assignment.semester} - Sec ${assignment.section}`
+        );
       } else {
-        setMessage('No CC assignment found. You may not have permission to create timetables.');
+        setMessage(
+          "No CC assignment found. You may not have permission to create timetables."
+        );
       }
     } catch (error) {
-      console.error('Error fetching CC assignment:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
+      console.error("Error fetching CC assignment:", error);
+      console.error("Error response:", error.response?.data);
+      console.error("Error status:", error.response?.status);
 
       if (error.response?.status === 401) {
-        setMessage('Authentication failed. Please log in again.');
+        setMessage("Authentication failed. Please log in again.");
       } else if (error.response?.status === 404) {
-        setMessage('Faculty record not found. Please contact admin.');
+        setMessage("Faculty record not found. Please contact admin.");
       } else {
-        setMessage(`Failed to fetch CC assignment: ${error.response?.data?.message || error.message}`);
+        setMessage(
+          `Failed to fetch CC assignment: ${
+            error.response?.data?.message || error.message
+          }`
+        );
       }
     } finally {
       setLoading(false);
@@ -131,47 +171,156 @@ export default function TimetableSimple({ userData }) {
       const headers = { Authorization: `Bearer ${token}` };
 
       // Load subjects for the department
-      const subjectsRes = await axios.get(
-        `http://localhost:5000/api/subjects/department/${encodeURIComponent(department)}`,
-        { headers }
-      );
+      console.log("Loading subjects for department:", department);
 
-      if (subjectsRes.data?.success) {
-        const subjectsList = subjectsRes.data.data || [];
-        setSubjects(subjectsList);
+      try {
+        const subjectsRes = await axios.get(
+          `http://localhost:5000/api/subjects/department/${encodeURIComponent(
+            department
+          )}`,
+          { headers }
+        );
+
+        console.log("Subjects API response:", subjectsRes.data);
+
+        if (subjectsRes.data?.success) {
+          const subjectsList = subjectsRes.data.data || [];
+          console.log("Subjects loaded:", subjectsList);
+          setSubjects(subjectsList);
+        } else {
+          console.log("Subjects API failed, trying alternative approach...");
+          // Try alternative API endpoint
+          const altSubjectsRes = await axios.get(
+            `http://localhost:5000/api/superadmin/subjects`,
+            { headers, params: { department: department } }
+          );
+
+          if (altSubjectsRes.data?.success) {
+            const altSubjectsList = altSubjectsRes.data.data || [];
+            console.log("Alternative subjects loaded:", altSubjectsList);
+            setSubjects(altSubjectsList);
+          } else {
+            console.log("Both subject APIs failed, setting empty array");
+            setSubjects([]);
+          }
+        }
 
         // Build subject-faculty mapping using the new API
         await buildSubjectFacultyMap(department, headers);
+      } catch (subjectsError) {
+        console.error("Error loading subjects:", subjectsError);
+        console.log("Trying to load subjects from faculty assignments...");
+
+        // Fallback: Load subjects from faculty-department-subject mapping
+        try {
+          const fdsRes = await axios.get(
+            `http://localhost:5000/api/faculty-dept-subject/department-faculty-subjects/${encodeURIComponent(
+              department
+            )}`,
+            { headers }
+          );
+
+          if (fdsRes.data?.success && fdsRes.data.data?.subjectFacultyMap) {
+            const subjectsFromFDS = Object.keys(
+              fdsRes.data.data.subjectFacultyMap
+            ).map((subjectName) => ({
+              name: subjectName,
+              code: subjectName.substring(0, 6).toUpperCase(),
+              _id: subjectName.replace(/\s+/g, "_").toLowerCase(),
+            }));
+
+            console.log("Subjects loaded from FDS mapping:", subjectsFromFDS);
+            setSubjects(subjectsFromFDS);
+          }
+        } catch (fdsError) {
+          console.error("FDS fallback also failed:", fdsError);
+          setSubjects([]);
+        }
       }
 
       // Load all teaching faculties for the department (for reference)
-      const facultiesRes = await axios.get(
-        "http://localhost:5000/api/faculty/faculties",
-        { params: { department, teachingOnly: 'true' }, headers },
-      );
+      console.log("Loading faculties for department:", department);
 
-      const facultyList = facultiesRes.data?.data?.faculties || facultiesRes.data?.faculties || [];
-      setFaculties(facultyList.map(f => ({
-        id: f.employeeId || f._id,
-        name: `${f.firstName} ${f.lastName || ''}`.trim(),
-        employeeId: f.employeeId
-      })));
+      try {
+        const facultiesRes = await axios.get(
+          "http://localhost:5000/api/faculty/faculties",
+          { params: { department, teachingOnly: "true" }, headers }
+        );
+
+        console.log("Faculties API response:", facultiesRes.data);
+
+        const facultyList =
+          facultiesRes.data?.data?.faculties ||
+          facultiesRes.data?.faculties ||
+          [];
+        console.log("Faculties loaded:", facultyList);
+
+        setFaculties(
+          facultyList.map((f) => ({
+            id: f.employeeId || f._id,
+            name: `${f.firstName} ${f.lastName || ""}`.trim(),
+            employeeId: f.employeeId,
+          }))
+        );
+      } catch (facultiesError) {
+        console.error("Error loading faculties:", facultiesError);
+        console.log("Trying alternative faculty loading...");
+
+        // Try alternative approach
+        try {
+          const altFacultiesRes = await axios.get(
+            "http://localhost:5000/api/faculty",
+            { headers }
+          );
+
+          const altFacultyList =
+            altFacultiesRes.data?.data || altFacultiesRes.data || [];
+          const filteredFaculties = altFacultyList.filter(
+            (f) => !department || f.department === department
+          );
+
+          console.log("Alternative faculties loaded:", filteredFaculties);
+
+          setFaculties(
+            filteredFaculties.map((f) => ({
+              id: f.employeeId || f._id,
+              name: `${f.firstName} ${f.lastName || ""}`.trim(),
+              employeeId: f.employeeId,
+            }))
+          );
+        } catch (altError) {
+          console.error("Alternative faculty loading failed:", altError);
+          setFaculties([]);
+        }
+      }
 
       // Load existing timetable conflicts
       await loadConflictingFaculties();
-
     } catch (error) {
-      console.error('Error loading department data:', error);
+      console.error("Error loading department data:", error);
 
       // Provide more specific error messages
       if (error.response?.status === 401 || error.response?.status === 403) {
-        setMessage('Authentication failed. Please refresh the page and log in again.');
+        setMessage(
+          "Authentication failed. Please refresh the page and log in again."
+        );
       } else if (error.response?.status === 500) {
-        setMessage('Server error while loading department data. Please try again or contact support.');
-      } else if (error.code === 'ECONNREFUSED' || error.message?.includes('Network Error')) {
-        setMessage('Cannot connect to server. Please ensure the backend is running.');
+        setMessage(
+          "Server error while loading department data. Please try again or contact support."
+        );
+      } else if (
+        error.code === "ECONNREFUSED" ||
+        error.message?.includes("Network Error")
+      ) {
+        setMessage(
+          "Cannot connect to server. Please ensure the backend is running."
+        );
       } else {
-        setMessage(`Failed to load department data: ${error.response?.data?.message || error.message}`);
+        setMessage(
+          `Failed to load department data: ${
+            error.response?.data?.message || error.message
+          }`
+        );
       }
     } finally {
       setLoading(false);
@@ -181,13 +330,17 @@ export default function TimetableSimple({ userData }) {
   // Build mapping of subjects to their assigned faculties using the new API
   const buildSubjectFacultyMap = async (department, headers) => {
     try {
-      console.log('Building subject-faculty map for department:', department);
+      console.log("Building subject-faculty map for department:", department);
 
       // Use the new dedicated API endpoint
       const response = await axios.get(
-        `http://localhost:5000/api/faculty-dept-subject/department-faculty-subjects/${encodeURIComponent(department)}`,
+        `http://localhost:5000/api/faculty-dept-subject/department-faculty-subjects/${encodeURIComponent(
+          department
+        )}`,
         { headers }
       );
+
+      console.log("Subject-faculty mapping API response:", response.data);
 
       if (response.data?.success) {
         const { subjectFacultyMap } = response.data.data;
@@ -199,29 +352,54 @@ export default function TimetableSimple({ userData }) {
         });
 
         setSubjectFacultyMap(mapping);
-        console.log('Subject-faculty mapping loaded:', mapping);
+        console.log("Subject-faculty mapping loaded:", mapping);
+
+        // If we don't have subjects loaded yet, extract them from the mapping
+        if (subjects.length === 0 && Object.keys(mapping).length > 0) {
+          const subjectsFromMapping = Object.keys(mapping).map(
+            (subjectName) => ({
+              name: subjectName,
+              code: subjectName.substring(0, 6).toUpperCase(),
+              _id: subjectName.replace(/\s+/g, "_").toLowerCase(),
+            })
+          );
+
+          console.log("Extracted subjects from mapping:", subjectsFromMapping);
+          setSubjects(subjectsFromMapping);
+        }
 
         // Show success message
-        const totalAssignments = Object.values(mapping).reduce((sum, faculties) => sum + faculties.length, 0);
-        setMessage(`Loaded ${Object.keys(mapping).length} subjects with ${totalAssignments} faculty assignments`);
+        const totalAssignments = Object.values(mapping).reduce(
+          (sum, faculties) => sum + faculties.length,
+          0
+        );
+        setMessage(
+          `Loaded ${
+            Object.keys(mapping).length
+          } subjects with ${totalAssignments} faculty assignments`
+        );
       } else {
-        console.error('Failed to load subject-faculty mapping:', response.data);
+        console.error("Failed to load subject-faculty mapping:", response.data);
 
         // Fallback: Try to build mapping manually from individual faculty records
-        console.log('Attempting fallback method to load faculty-subject assignments...');
+        console.log(
+          "Attempting fallback method to load faculty-subject assignments..."
+        );
         await buildSubjectFacultyMapFallback(department, headers);
       }
     } catch (error) {
-      console.error('Error building subject-faculty map:', error);
+      console.error("Error building subject-faculty map:", error);
 
       // Check for authentication errors
       if (error.response?.status === 401 || error.response?.status === 403) {
-        setMessage('Authentication failed. Please refresh the page and log in again.');
+        setMessage(
+          "Authentication failed. Please refresh the page and log in again."
+        );
         return;
       }
 
       // For other errors, try fallback method
-      console.log('Attempting fallback method due to API error...');
+      console.log("Attempting fallback method due to API error...");
       await buildSubjectFacultyMapFallback(department, headers);
     }
   };
@@ -229,31 +407,52 @@ export default function TimetableSimple({ userData }) {
   // Fallback method to build subject-faculty mapping
   const buildSubjectFacultyMapFallback = async (department, headers) => {
     try {
-      console.log('Using fallback method to build subject-faculty mapping...');
+      console.log("Using fallback method to build subject-faculty mapping...");
 
       // Get all faculties for the department
-      const facultiesRes = await axios.get(
-        "http://localhost:5000/api/faculty/faculties",
-        { params: { department, teachingOnly: 'true' }, headers }
-      );
+      let facultyList = [];
 
-      const facultyList = facultiesRes.data?.data?.faculties || facultiesRes.data?.faculties || [];
-      console.log('Faculties found:', facultyList.length);
+      try {
+        const facultiesRes = await axios.get(
+          "http://localhost:5000/api/faculty/faculties",
+          { params: { department, teachingOnly: "true" }, headers }
+        );
+        facultyList =
+          facultiesRes.data?.data?.faculties ||
+          facultiesRes.data?.faculties ||
+          [];
+      } catch (error) {
+        console.log("Primary faculty API failed, trying alternative...");
+        const altFacultiesRes = await axios.get(
+          "http://localhost:5000/api/faculty",
+          { headers }
+        );
+        const allFaculties =
+          altFacultiesRes.data?.data || altFacultiesRes.data || [];
+        facultyList = allFaculties.filter(
+          (f) => !department || f.department === department
+        );
+      }
+
+      console.log("Faculties found for fallback:", facultyList.length);
 
       // Build mapping by checking each faculty's subjects
       const mapping = {};
+      const uniqueSubjects = new Set();
 
       for (const faculty of facultyList) {
-        const facultyName = `${faculty.firstName} ${faculty.lastName || ''}`.trim();
+        const facultyName = `${faculty.firstName} ${
+          faculty.lastName || ""
+        }`.trim();
         const subjectsTaught = faculty.subjectsTaught || [];
 
         console.log(`Faculty ${facultyName} teaches:`, subjectsTaught);
 
         // Handle both populated and non-populated subjects
-        subjectsTaught.forEach(subject => {
-          let subjectName = '';
+        subjectsTaught.forEach((subject) => {
+          let subjectName = "";
 
-          if (typeof subject === 'string') {
+          if (typeof subject === "string") {
             subjectName = subject;
           } else if (subject && subject.name) {
             subjectName = subject.name;
@@ -263,41 +462,84 @@ export default function TimetableSimple({ userData }) {
           }
 
           if (subjectName) {
+            uniqueSubjects.add(subjectName);
+
             if (!mapping[subjectName]) {
               mapping[subjectName] = [];
             }
 
             // Check if faculty is already added for this subject
-            const facultyExists = mapping[subjectName].some(f => f.name === facultyName);
+            const facultyExists = mapping[subjectName].some(
+              (f) => f.name === facultyName
+            );
             if (!facultyExists) {
               mapping[subjectName].push({
                 name: facultyName,
                 employeeId: faculty.employeeId || faculty._id,
-                id: faculty._id
+                id: faculty._id,
               });
             }
           }
         });
       }
 
+      // If we still don't have subjects in the main state, create them from the mapping
+      if (subjects.length === 0 && uniqueSubjects.size > 0) {
+        const subjectsFromMapping = Array.from(uniqueSubjects).map(
+          (subjectName) => ({
+            name: subjectName,
+            code: subjectName.substring(0, 6).toUpperCase(),
+            _id: subjectName.replace(/\s+/g, "_").toLowerCase(),
+          })
+        );
+
+        console.log(
+          "Created subjects from faculty assignments:",
+          subjectsFromMapping
+        );
+        setSubjects(subjectsFromMapping);
+      }
+
       setSubjectFacultyMap(mapping);
-      console.log('Fallback subject-faculty mapping loaded:', mapping);
+      console.log("Fallback subject-faculty mapping loaded:", mapping);
 
-      const totalAssignments = Object.values(mapping).reduce((sum, faculties) => sum + faculties.length, 0);
-      setMessage(`Loaded ${Object.keys(mapping).length} subjects with ${totalAssignments} faculty assignments (fallback method)`);
-
+      const totalAssignments = Object.values(mapping).reduce(
+        (sum, faculties) => sum + faculties.length,
+        0
+      );
+      setMessage(
+        `Loaded ${
+          Object.keys(mapping).length
+        } subjects with ${totalAssignments} faculty assignments (fallback method)`
+      );
     } catch (fallbackError) {
-      console.error('Fallback method also failed:', fallbackError);
+      console.error("Fallback method also failed:", fallbackError);
 
       // Check for authentication errors
-      if (fallbackError.response?.status === 401 || fallbackError.response?.status === 403) {
-        setMessage('Authentication failed. Please refresh the page and log in again.');
+      if (
+        fallbackError.response?.status === 401 ||
+        fallbackError.response?.status === 403
+      ) {
+        setMessage(
+          "Authentication failed. Please refresh the page and log in again."
+        );
       } else if (fallbackError.response?.status === 500) {
-        setMessage('Server error. The backend may need to be restarted or there may be a database issue.');
-      } else if (fallbackError.code === 'ECONNREFUSED' || fallbackError.message?.includes('Network Error')) {
-        setMessage('Cannot connect to server. Please ensure the backend is running on port 5000.');
+        setMessage(
+          "Server error. The backend may need to be restarted or there may be a database issue."
+        );
+      } else if (
+        fallbackError.code === "ECONNREFUSED" ||
+        fallbackError.message?.includes("Network Error")
+      ) {
+        setMessage(
+          "Cannot connect to server. Please ensure the backend is running on port 5000."
+        );
       } else {
-        setMessage(`Failed to load subject-faculty assignments: ${fallbackError.response?.data?.message || fallbackError.message}`);
+        setMessage(
+          `Failed to load subject-faculty assignments: ${
+            fallbackError.response?.data?.message || fallbackError.message
+          }`
+        );
       }
 
       setSubjectFacultyMap({});
@@ -308,43 +550,51 @@ export default function TimetableSimple({ userData }) {
   const loadConflictingFaculties = async () => {
     try {
       const token = localStorage.getItem("authToken");
-      const response = await axios.get('http://localhost:5000/api/timetable', {
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await axios.get("http://localhost:5000/api/timetable", {
+        headers: { Authorization: `Bearer ${token}` },
       });
       const allTimetables = response.data || [];
 
       const conflicts = {};
       const facultySchedules = {}; // Track all faculty schedules for better visualization
 
-      console.log('🔍 Loading conflicts from', allTimetables.length, 'timetables');
+      console.log(
+        "🔍 Loading conflicts from",
+        allTimetables.length,
+        "timetables"
+      );
 
-      allTimetables.forEach(timetable => {
-        const ttInfo = `${timetable.collegeInfo?.department || 'Unknown'} - ${timetable.collegeInfo?.semester || 'Unknown'} - ${timetable.collegeInfo?.section || 'Unknown'}`;
+      allTimetables.forEach((timetable) => {
+        const ttInfo = `${timetable.collegeInfo?.department || "Unknown"} - ${
+          timetable.collegeInfo?.semester || "Unknown"
+        } - ${timetable.collegeInfo?.section || "Unknown"}`;
 
         // Skip current user's exact timetable (same dept, sem, section)
-        const isCurrentTimetable = ccAssignment &&
+        const isCurrentTimetable =
+          ccAssignment &&
           timetable.collegeInfo?.department === ccAssignment.department &&
           timetable.collegeInfo?.semester === ccAssignment.semester &&
           timetable.collegeInfo?.section === ccAssignment.section;
 
-        timetable.timetableData?.forEach(day => {
-          day.classes?.forEach(cls => {
+        timetable.timetableData?.forEach((day) => {
+          day.classes?.forEach((cls) => {
             if (cls && cls.faculty && cls.timeSlot) {
               const conflictKey = `${day.day}_${cls.timeSlot}`;
               const facultyKey = cls.faculty;
 
               // Initialize conflict tracking
               if (!conflicts[conflictKey]) conflicts[conflictKey] = [];
-              if (!facultySchedules[facultyKey]) facultySchedules[facultyKey] = [];
+              if (!facultySchedules[facultyKey])
+                facultySchedules[facultyKey] = [];
 
               // Add conflict info with details
               const conflictInfo = {
                 faculty: cls.faculty,
-                subject: cls.subject || 'Unknown Subject',
+                subject: cls.subject || "Unknown Subject",
                 timetableInfo: ttInfo,
                 isCurrentTimetable: isCurrentTimetable,
                 day: day.day,
-                timeSlot: cls.timeSlot
+                timeSlot: cls.timeSlot,
               };
 
               // Only add to conflicts if it's NOT the current timetable
@@ -359,34 +609,33 @@ export default function TimetableSimple({ userData }) {
         });
       });
 
-      console.log('📊 Conflict summary:', {
+      console.log("📊 Conflict summary:", {
         totalConflictSlots: Object.keys(conflicts).length,
-        totalFacultySchedules: Object.keys(facultySchedules).length
+        totalFacultySchedules: Object.keys(facultySchedules).length,
       });
 
       setConflictingFaculties(conflicts);
 
       // Store faculty schedules for advanced display
       setFacultySchedules(facultySchedules);
-
     } catch (error) {
-      console.error('Error loading faculty conflicts:', error);
+      console.error("Error loading faculty conflicts:", error);
     }
   };
 
   // Initialize empty timetable
   const initializeTimetable = () => {
-    const schedule = DEFAULT_DAYS.map(day => ({
+    const schedule = DEFAULT_DAYS.map((day) => ({
       day,
-      periods: timeSlots.map(slot => ({
+      periods: timeSlots.map((slot) => ({
         timeSlot: slot.timeSlot,
-        subject: '',
-        faculty: '',
-        type: slot.isBreak ? 'Break' : 'Theory'
-      }))
+        subject: "",
+        faculty: "",
+        type: slot.isBreak ? "Break" : "Theory",
+      })),
     }));
 
-    setTimetable(prev => ({ ...prev, schedule }));
+    setTimetable((prev) => ({ ...prev, schedule }));
     setCurrentTimetableId(null); // Clear current timetable ID for new timetable
     setIsEditing(true);
   };
@@ -394,127 +643,167 @@ export default function TimetableSimple({ userData }) {
   // Add new time slot
   const addTimeSlot = () => {
     if (!newTimeSlot.start || !newTimeSlot.end) {
-      setMessage('Please enter both start and end times');
+      setMessage("Please enter both start and end times");
       return;
     }
 
     const timeSlotString = `${newTimeSlot.start}-${newTimeSlot.end}`;
 
-    if (timeSlots.some(slot => slot.timeSlot === timeSlotString)) {
-      setMessage('This time slot already exists');
+    if (timeSlots.some((slot) => slot.timeSlot === timeSlotString)) {
+      setMessage("This time slot already exists");
       return;
     }
 
     const newSlot = {
       timeSlot: timeSlotString,
-      isBreak: newTimeSlot.isBreak
+      isBreak: newTimeSlot.isBreak,
     };
 
-    setTimeSlots(prev => [...prev, newSlot]);
-    setNewTimeSlot({ start: '', end: '', isBreak: false });
-    setMessage('Time slot added successfully!');
+    setTimeSlots((prev) => [...prev, newSlot]);
+    setNewTimeSlot({ start: "", end: "", isBreak: false });
+    setMessage("Time slot added successfully!");
 
     // Update existing timetable if it exists
     if (timetable.schedule.length > 0) {
-      const updatedSchedule = timetable.schedule.map(day => ({
+      const updatedSchedule = timetable.schedule.map((day) => ({
         ...day,
-        periods: [...day.periods, {
-          timeSlot: timeSlotString,
-          subject: '',
-          faculty: '',
-          type: newTimeSlot.isBreak ? 'Break' : 'Theory'
-        }]
+        periods: [
+          ...day.periods,
+          {
+            timeSlot: timeSlotString,
+            subject: "",
+            faculty: "",
+            type: newTimeSlot.isBreak ? "Break" : "Theory",
+          },
+        ],
       }));
-      setTimetable(prev => ({ ...prev, schedule: updatedSchedule }));
+      setTimetable((prev) => ({ ...prev, schedule: updatedSchedule }));
     }
   };
 
   // Remove time slot
   const removeTimeSlot = (timeSlotToRemove) => {
-    setTimeSlots(prev => prev.filter(slot => slot.timeSlot !== timeSlotToRemove));
+    setTimeSlots((prev) =>
+      prev.filter((slot) => slot.timeSlot !== timeSlotToRemove)
+    );
 
     // Update existing timetable if it exists
     if (timetable.schedule.length > 0) {
-      const updatedSchedule = timetable.schedule.map(day => ({
+      const updatedSchedule = timetable.schedule.map((day) => ({
         ...day,
-        periods: day.periods.filter(period => period.timeSlot !== timeSlotToRemove)
+        periods: day.periods.filter(
+          (period) => period.timeSlot !== timeSlotToRemove
+        ),
       }));
-      setTimetable(prev => ({ ...prev, schedule: updatedSchedule }));
+      setTimetable((prev) => ({ ...prev, schedule: updatedSchedule }));
     }
 
-    setMessage('Time slot removed successfully!');
+    setMessage("Time slot removed successfully!");
   };
 
   // Toggle break status of time slot
   const toggleBreakStatus = (timeSlotToToggle) => {
-    setTimeSlots(prev => prev.map(slot =>
-      slot.timeSlot === timeSlotToToggle
-        ? { ...slot, isBreak: !slot.isBreak }
-        : slot
-    ));
+    setTimeSlots((prev) =>
+      prev.map((slot) =>
+        slot.timeSlot === timeSlotToToggle
+          ? { ...slot, isBreak: !slot.isBreak }
+          : slot
+      )
+    );
 
     // Update existing timetable if it exists
     if (timetable.schedule.length > 0) {
-      const updatedSchedule = timetable.schedule.map(day => ({
+      const updatedSchedule = timetable.schedule.map((day) => ({
         ...day,
-        periods: day.periods.map(period =>
+        periods: day.periods.map((period) =>
           period.timeSlot === timeSlotToToggle
-            ? { ...period, type: period.type === 'Break' ? 'Theory' : 'Break', subject: '', faculty: '' }
+            ? {
+                ...period,
+                type: period.type === "Break" ? "Theory" : "Break",
+                subject: "",
+                faculty: "",
+              }
             : period
-        )
+        ),
       }));
-      setTimetable(prev => ({ ...prev, schedule: updatedSchedule }));
+      setTimetable((prev) => ({ ...prev, schedule: updatedSchedule }));
     }
 
-    setMessage('Time slot updated successfully!');
+    setMessage("Time slot updated successfully!");
   };
 
   // Update a specific cell in the timetable
   const updateCell = async (dayIndex, periodIndex, field, value) => {
-    setTimetable(prev => {
+    setTimetable((prev) => {
       const newSchedule = [...prev.schedule];
       const currentPeriod = newSchedule[dayIndex].periods[periodIndex];
 
       // If subject is changed, clear faculty and auto-select if only one option
-      if (field === 'subject') {
+      if (field === "subject") {
         currentPeriod.subject = value;
-        currentPeriod.faculty = ''; // Clear faculty when subject changes
+        currentPeriod.faculty = ""; // Clear faculty when subject changes
 
         console.log(`[UPDATE_CELL] Subject changed to: "${value}"`);
 
         // Get available faculties for this subject
-        const availableFaculties = getAvailableFacultiesForSubject(value, newSchedule[dayIndex].day, currentPeriod.timeSlot);
+        const availableFaculties = getAvailableFacultiesForSubject(
+          value,
+          newSchedule[dayIndex].day,
+          currentPeriod.timeSlot
+        );
 
         console.log(`[UPDATE_CELL] Available faculties:`, availableFaculties);
 
         // Auto-select if only one faculty is available
         if (availableFaculties.length === 1) {
           currentPeriod.faculty = availableFaculties[0].name;
-          setMessage(`Auto-selected faculty: ${availableFaculties[0].name} for ${value}`);
-          console.log(`[UPDATE_CELL] Auto-selected faculty: ${availableFaculties[0].name}`);
+          setMessage(
+            `Auto-selected faculty: ${availableFaculties[0].name} for ${value}`
+          );
+          console.log(
+            `[UPDATE_CELL] Auto-selected faculty: ${availableFaculties[0].name}`
+          );
         } else if (availableFaculties.length === 0 && value) {
-          console.log(`[UPDATE_CELL] No faculties found locally, trying API...`);
+          console.log(
+            `[UPDATE_CELL] No faculties found locally, trying API...`
+          );
           // Try to fetch from API if not in local map
-          getFacultiesForSubject(value).then(apiFaculties => {
-            console.log(`[UPDATE_CELL] API returned faculties:`, apiFaculties);
-            if (apiFaculties.length === 1) {
-              setTimetable(prevTimetable => {
-                const updatedSchedule = [...prevTimetable.schedule];
-                updatedSchedule[dayIndex].periods[periodIndex].faculty = apiFaculties[0].name;
-                return { ...prevTimetable, schedule: updatedSchedule };
-              });
-              setMessage(`Auto-selected faculty: ${apiFaculties[0].name} for ${value}`);
-            } else if (apiFaculties.length > 1) {
-              setMessage(`${apiFaculties.length} faculties available for ${value}. Please select one.`);
-            } else {
-              setMessage(`No faculty assigned to teach ${value}. Please contact admin.`);
-            }
-          }).catch(error => {
-            console.error('[UPDATE_CELL] API call failed:', error);
-            setMessage(`Unable to load faculty for ${value}. Please try again.`);
-          });
+          getFacultiesForSubject(value)
+            .then((apiFaculties) => {
+              console.log(
+                `[UPDATE_CELL] API returned faculties:`,
+                apiFaculties
+              );
+              if (apiFaculties.length === 1) {
+                setTimetable((prevTimetable) => {
+                  const updatedSchedule = [...prevTimetable.schedule];
+                  updatedSchedule[dayIndex].periods[periodIndex].faculty =
+                    apiFaculties[0].name;
+                  return { ...prevTimetable, schedule: updatedSchedule };
+                });
+                setMessage(
+                  `Auto-selected faculty: ${apiFaculties[0].name} for ${value}`
+                );
+              } else if (apiFaculties.length > 1) {
+                setMessage(
+                  `${apiFaculties.length} faculties available for ${value}. Please select one.`
+                );
+              } else {
+                setMessage(
+                  `No faculty assigned to teach ${value}. Please contact admin.`
+                );
+              }
+            })
+            .catch((error) => {
+              console.error("[UPDATE_CELL] API call failed:", error);
+              setMessage(
+                `Unable to load faculty for ${value}. Please try again.`
+              );
+            });
         } else if (availableFaculties.length > 1) {
-          setMessage(`${availableFaculties.length} faculties available for ${value}. Please select one.`);
+          setMessage(
+            `${availableFaculties.length} faculties available for ${value}. Please select one.`
+          );
         }
       } else {
         currentPeriod[field] = value;
@@ -529,8 +818,13 @@ export default function TimetableSimple({ userData }) {
   const getAvailableFacultiesForSubject = (subjectName, day, timeSlot) => {
     if (!subjectName) return [];
 
-    console.log(`[ADVANCED_DEBUG] Checking faculty for subject: "${subjectName}" on ${day} at ${timeSlot}`);
-    console.log(`[ADVANCED_DEBUG] Available subjects in map:`, Object.keys(subjectFacultyMap));
+    console.log(
+      `[ADVANCED_DEBUG] Checking faculty for subject: "${subjectName}" on ${day} at ${timeSlot}`
+    );
+    console.log(
+      `[ADVANCED_DEBUG] Available subjects in map:`,
+      Object.keys(subjectFacultyMap)
+    );
 
     // Get faculties assigned to this subject - try exact match first
     let assignedFaculties = subjectFacultyMap[subjectName] || [];
@@ -538,30 +832,40 @@ export default function TimetableSimple({ userData }) {
     // If no exact match, try case-insensitive match
     if (assignedFaculties.length === 0) {
       const subjectKey = Object.keys(subjectFacultyMap).find(
-        key => key.toLowerCase() === subjectName.toLowerCase()
+        (key) => key.toLowerCase() === subjectName.toLowerCase()
       );
       if (subjectKey) {
         assignedFaculties = subjectFacultyMap[subjectKey] || [];
-        console.log(`[ADVANCED_DEBUG] Found case-insensitive match for "${subjectName}" -> "${subjectKey}"`);
+        console.log(
+          `[ADVANCED_DEBUG] Found case-insensitive match for "${subjectName}" -> "${subjectKey}"`
+        );
       }
     }
 
     // If still no match, try partial match
     if (assignedFaculties.length === 0) {
       const subjectKey = Object.keys(subjectFacultyMap).find(
-        key => key.toLowerCase().includes(subjectName.toLowerCase()) ||
+        (key) =>
+          key.toLowerCase().includes(subjectName.toLowerCase()) ||
           subjectName.toLowerCase().includes(key.toLowerCase())
       );
       if (subjectKey) {
         assignedFaculties = subjectFacultyMap[subjectKey] || [];
-        console.log(`[ADVANCED_DEBUG] Found partial match for "${subjectName}" -> "${subjectKey}"`);
+        console.log(
+          `[ADVANCED_DEBUG] Found partial match for "${subjectName}" -> "${subjectKey}"`
+        );
       }
     }
 
-    console.log(`[ADVANCED_DEBUG] Assigned faculties for "${subjectName}":`, assignedFaculties);
+    console.log(
+      `[ADVANCED_DEBUG] Assigned faculties for "${subjectName}":`,
+      assignedFaculties
+    );
 
     if (assignedFaculties.length === 0) {
-      console.log(`[ADVANCED_DEBUG] No faculty assigned to subject: ${subjectName}`);
+      console.log(
+        `[ADVANCED_DEBUG] No faculty assigned to subject: ${subjectName}`
+      );
       return [];
     }
 
@@ -569,21 +873,23 @@ export default function TimetableSimple({ userData }) {
     const conflictKey = `${day}_${timeSlot}`;
     const conflictedFaculties = conflictingFaculties[conflictKey] || [];
 
-    const availableFaculties = assignedFaculties.filter(faculty => {
+    const availableFaculties = assignedFaculties.filter((faculty) => {
       const isConflicted = conflictedFaculties.includes(faculty.name);
 
       if (isConflicted) {
-        console.log(`[CONFLICT_DETECTED] ${faculty.name} is busy at ${day} ${timeSlot} in another class`);
+        console.log(
+          `[CONFLICT_DETECTED] ${faculty.name} is busy at ${day} ${timeSlot} in another class`
+        );
       }
 
       return !isConflicted;
     });
 
     // Add faculty schedule info for better UX
-    const facultiesWithScheduleInfo = availableFaculties.map(faculty => {
+    const facultiesWithScheduleInfo = availableFaculties.map((faculty) => {
       const facultySchedule = facultySchedules[faculty.name] || [];
       const conflictsAtThisTime = facultySchedule.filter(
-        schedule => schedule.day === day && schedule.timeSlot === timeSlot
+        (schedule) => schedule.day === day && schedule.timeSlot === timeSlot
       );
 
       return {
@@ -591,12 +897,15 @@ export default function TimetableSimple({ userData }) {
         scheduleInfo: {
           totalClasses: facultySchedule.length,
           conflictsAtThisTime: conflictsAtThisTime,
-          hasConflict: conflictsAtThisTime.length > 0
-        }
+          hasConflict: conflictsAtThisTime.length > 0,
+        },
       };
     });
 
-    console.log(`[ADVANCED_DEBUG] Available faculties for ${subjectName} at ${day} ${timeSlot}:`, facultiesWithScheduleInfo);
+    console.log(
+      `[ADVANCED_DEBUG] Available faculties for ${subjectName} at ${day} ${timeSlot}:`,
+      facultiesWithScheduleInfo
+    );
 
     return facultiesWithScheduleInfo;
   };
@@ -608,10 +917,12 @@ export default function TimetableSimple({ userData }) {
     try {
       const token = localStorage.getItem("authToken");
       const response = await axios.get(
-        `http://localhost:5000/api/faculty-subject/subject-faculty-by-name/${encodeURIComponent(subjectName)}`,
+        `http://localhost:5000/api/faculty-subject/subject-faculty-by-name/${encodeURIComponent(
+          subjectName
+        )}`,
         {
           headers: { Authorization: `Bearer ${token}` },
-          params: { department: ccAssignment.department }
+          params: { department: ccAssignment.department },
         }
       );
 
@@ -619,26 +930,55 @@ export default function TimetableSimple({ userData }) {
         return response.data.data.faculties || [];
       }
     } catch (error) {
-      console.error('Error fetching faculties for subject:', error);
+      console.error("Error fetching faculties for subject:", error);
     }
 
     return [];
   };
 
+  // Refresh function for debugging
+  const handleRefreshData = async () => {
+    setIsLoading(true);
+    setLoadingStatus("Refreshing data...");
+
+    try {
+      // Clear existing data
+      setSubjects([]);
+      setFaculties([]);
+      setSubjectFacultyMap({});
+
+      // Reload everything with the current department
+      if (ccAssignment?.department) {
+        await loadDepartmentData(ccAssignment.department);
+        setLoadingStatus("Data refreshed successfully!");
+      } else {
+        setLoadingStatus("No CC assignment found - cannot reload data");
+      }
+
+      setTimeout(() => setLoadingStatus(""), 3000);
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+      setLoadingStatus("Failed to refresh data");
+      setTimeout(() => setLoadingStatus(""), 3000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Save timetable
   const saveTimetable = async () => {
     if (!ccAssignment) {
-      setMessage('No CC assignment found. Cannot save timetable.');
+      setMessage("No CC assignment found. Cannot save timetable.");
       return;
     }
 
     if (!timetable.department || !timetable.semester || !timetable.section) {
-      setMessage('Please ensure all basic information is filled');
+      setMessage("Please ensure all basic information is filled");
       return;
     }
 
     if (!timetable.schedule || timetable.schedule.length === 0) {
-      setMessage('Please create a timetable schedule first.');
+      setMessage("Please create a timetable schedule first.");
       return;
     }
 
@@ -649,43 +989,47 @@ export default function TimetableSimple({ userData }) {
       // Prepare data in the backend expected format
       const payload = {
         collegeInfo: {
-          name: 'College Name', // Make this configurable if needed
-          status: 'Active',
+          name: "College Name", // Make this configurable if needed
+          status: "Active",
           department: timetable.department,
           semester: timetable.semester,
           section: timetable.section,
-          date: new Date().toISOString().split('T')[0]
+          date: new Date().toISOString().split("T")[0],
         },
-        subjects: subjects.map(subject => ({
-          code: subject.code || '',
+        subjects: subjects.map((subject) => ({
+          code: subject.code || "",
           name: subject.name,
-          faculty: subject.faculty || ''
+          faculty: subject.faculty || "",
         })),
-        timetableData: timetable.schedule.map(day => ({
+        timetableData: timetable.schedule.map((day) => ({
           day: day.day,
           classes: day.periods
-            .filter(period => period.subject && period.type !== 'Break')
-            .map(period => ({
+            .filter((period) => period.subject && period.type !== "Break")
+            .map((period) => ({
               subject: period.subject,
               faculty: period.faculty,
-              type: period.type || 'Theory',
+              type: period.type || "Theory",
               timeSlot: period.timeSlot,
-              colSpan: 1
-            }))
+              colSpan: 1,
+            })),
         })),
-        timeSlots: timeSlots.map(slot => slot.timeSlot)
+        timeSlots: timeSlots.map((slot) => slot.timeSlot),
       };
 
-      console.log('Saving timetable payload:', payload);
+      console.log("Saving timetable payload:", payload);
 
-      const response = await axios.post('http://localhost:5000/api/timetable', payload, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axios.post(
+        "http://localhost:5000/api/timetable",
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       if (response.data?.success) {
-        setMessage('Timetable saved successfully!');
+        setMessage("Timetable saved successfully!");
         setIsEditing(false);
-        console.log('Timetable saved:', response.data.data);
+        console.log("Timetable saved:", response.data.data);
 
         // Store the new timetable ID for future operations
         if (response.data.data && response.data.data._id) {
@@ -695,19 +1039,23 @@ export default function TimetableSimple({ userData }) {
         // Reload conflicts after saving
         loadConflictingFaculties();
       } else {
-        throw new Error(response.data?.message || 'Failed to save timetable');
+        throw new Error(response.data?.message || "Failed to save timetable");
       }
     } catch (error) {
-      console.error('Error saving timetable:', error);
+      console.error("Error saving timetable:", error);
 
       if (error.response?.status === 403) {
-        setMessage('Access denied. You can only create timetables for your assigned class.');
+        setMessage(
+          "Access denied. You can only create timetables for your assigned class."
+        );
       } else if (error.response?.status === 409) {
-        setMessage('A timetable already exists for this department, semester, and section.');
+        setMessage(
+          "A timetable already exists for this department, semester, and section."
+        );
       } else if (error.response?.data?.error) {
         setMessage(`Failed to save: ${error.response.data.error}`);
       } else {
-        setMessage('Failed to save timetable. Please try again.');
+        setMessage("Failed to save timetable. Please try again.");
       }
     } finally {
       setLoading(false);
@@ -717,66 +1065,75 @@ export default function TimetableSimple({ userData }) {
   // Load existing timetable
   const loadTimetable = async () => {
     if (!ccAssignment) {
-      console.log('No CC assignment available for loading timetable');
+      console.log("No CC assignment available for loading timetable");
       return;
     }
 
     setLoading(true);
     try {
-      const token = localStorage.getItem('authToken');
-      const response = await axios.get('http://localhost:5000/api/timetable', {
+      const token = localStorage.getItem("authToken");
+      const response = await axios.get("http://localhost:5000/api/timetable", {
         params: {
-          department: ccAssignment.department
+          department: ccAssignment.department,
         },
         headers: {
-          Authorization: `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
 
-      console.log('Load timetable response:', response.data);
+      console.log("Load timetable response:", response.data);
 
       // Handle new response format - could be array or single object
       let timetableData = null;
 
       if (Array.isArray(response.data)) {
         // Find timetable matching our CC assignment
-        timetableData = response.data.find(tt =>
-          tt.collegeInfo?.department === ccAssignment.department &&
-          tt.collegeInfo?.semester === ccAssignment.semester &&
-          tt.collegeInfo?.section === ccAssignment.section
+        timetableData = response.data.find(
+          (tt) =>
+            tt.collegeInfo?.department === ccAssignment.department &&
+            tt.collegeInfo?.semester === ccAssignment.semester &&
+            tt.collegeInfo?.section === ccAssignment.section
         );
       } else if (response.data && response.data.collegeInfo) {
         timetableData = response.data;
       }
 
       if (timetableData) {
-        console.log('Found matching timetable:', timetableData);
+        console.log("Found matching timetable:", timetableData);
 
         // Store timetable ID for deletion
         setCurrentTimetableId(timetableData._id);
 
         // Load custom time slots if available
         if (timetableData.timeSlots && Array.isArray(timetableData.timeSlots)) {
-          const loadedTimeSlots = timetableData.timeSlots.map(slot => ({
+          const loadedTimeSlots = timetableData.timeSlots.map((slot) => ({
             timeSlot: slot,
-            isBreak: slot.includes('11:15') || slot.includes('Break')
+            isBreak: slot.includes("11:15") || slot.includes("Break"),
           }));
           setTimeSlots(loadedTimeSlots);
         }
 
         // Load timetable schedule
-        if (timetableData.timetableData && Array.isArray(timetableData.timetableData)) {
-          const schedule = DEFAULT_DAYS.map(day => {
-            const dayData = timetableData.timetableData.find(d => d.day === day);
+        if (
+          timetableData.timetableData &&
+          Array.isArray(timetableData.timetableData)
+        ) {
+          const schedule = DEFAULT_DAYS.map((day) => {
+            const dayData = timetableData.timetableData.find(
+              (d) => d.day === day
+            );
 
             if (dayData && dayData.classes) {
-              const periods = timeSlots.map(timeSlot => {
-                const classData = dayData.classes.find(c => c.timeSlot === timeSlot.timeSlot);
+              const periods = timeSlots.map((timeSlot) => {
+                const classData = dayData.classes.find(
+                  (c) => c.timeSlot === timeSlot.timeSlot
+                );
                 return {
                   timeSlot: timeSlot.timeSlot,
-                  subject: classData?.subject || '',
-                  faculty: classData?.faculty || '',
-                  type: classData?.type || (timeSlot.isBreak ? 'Break' : 'Theory')
+                  subject: classData?.subject || "",
+                  faculty: classData?.faculty || "",
+                  type:
+                    classData?.type || (timeSlot.isBreak ? "Break" : "Theory"),
                 };
               });
 
@@ -785,36 +1142,36 @@ export default function TimetableSimple({ userData }) {
               // Create empty periods for days without data
               return {
                 day,
-                periods: timeSlots.map(timeSlot => ({
+                periods: timeSlots.map((timeSlot) => ({
                   timeSlot: timeSlot.timeSlot,
-                  subject: '',
-                  faculty: '',
-                  type: timeSlot.isBreak ? 'Break' : 'Theory'
-                }))
+                  subject: "",
+                  faculty: "",
+                  type: timeSlot.isBreak ? "Break" : "Theory",
+                })),
               };
             }
           });
 
-          setTimetable(prev => ({
+          setTimetable((prev) => ({
             ...prev,
-            schedule
+            schedule,
           }));
         }
 
-        setMessage('Timetable loaded successfully!');
-        console.log('Timetable loaded and set');
+        setMessage("Timetable loaded successfully!");
+        console.log("Timetable loaded and set");
       } else {
-        console.log('No matching timetable found');
-        setMessage('No existing timetable found for your assignment.');
+        console.log("No matching timetable found");
+        setMessage("No existing timetable found for your assignment.");
       }
     } catch (error) {
-      console.error('Error loading timetable:', error);
+      console.error("Error loading timetable:", error);
       if (error.response?.status === 404) {
-        setMessage('No existing timetable found.');
+        setMessage("No existing timetable found.");
       } else if (error.response?.data?.error) {
         setMessage(`Failed to load: ${error.response.data.error}`);
       } else {
-        setMessage('Failed to load existing timetable.');
+        setMessage("Failed to load existing timetable.");
       }
     } finally {
       setLoading(false);
@@ -824,7 +1181,7 @@ export default function TimetableSimple({ userData }) {
   // Delete timetable function
   const deleteTimetable = async () => {
     if (!currentTimetableId) {
-      setMessage('No timetable found to delete.');
+      setMessage("No timetable found to delete.");
       return;
     }
 
@@ -835,17 +1192,17 @@ export default function TimetableSimple({ userData }) {
       const response = await axios.delete(
         `http://localhost:5000/api/timetable/${currentTimetableId}`,
         {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
 
       if (response.data?.success) {
-        setMessage('Timetable deleted successfully!');
+        setMessage("Timetable deleted successfully!");
 
         // Clear current timetable data
-        setTimetable(prev => ({
+        setTimetable((prev) => ({
           ...prev,
-          schedule: []
+          schedule: [],
         }));
         setCurrentTimetableId(null);
         setIsEditing(false);
@@ -854,21 +1211,23 @@ export default function TimetableSimple({ userData }) {
         // Reload conflicts after deletion
         loadConflictingFaculties();
 
-        console.log('Timetable deleted:', response.data.data);
+        console.log("Timetable deleted:", response.data.data);
       } else {
-        throw new Error(response.data?.message || 'Failed to delete timetable');
+        throw new Error(response.data?.message || "Failed to delete timetable");
       }
     } catch (error) {
-      console.error('Error deleting timetable:', error);
+      console.error("Error deleting timetable:", error);
 
       if (error.response?.status === 403) {
-        setMessage('Access denied. You can only delete timetables for your assigned class.');
+        setMessage(
+          "Access denied. You can only delete timetables for your assigned class."
+        );
       } else if (error.response?.status === 404) {
-        setMessage('Timetable not found. It may have been already deleted.');
+        setMessage("Timetable not found. It may have been already deleted.");
       } else if (error.response?.data?.error) {
         setMessage(`Failed to delete: ${error.response.data.error}`);
       } else {
-        setMessage('Failed to delete timetable. Please try again.');
+        setMessage("Failed to delete timetable. Please try again.");
       }
     } finally {
       setLoading(false);
@@ -878,7 +1237,7 @@ export default function TimetableSimple({ userData }) {
   // Clear message after 3 seconds
   useEffect(() => {
     if (message) {
-      const timer = setTimeout(() => setMessage(''), 3000);
+      const timer = setTimeout(() => setMessage(""), 3000);
       return () => clearTimeout(timer);
     }
   }, [message]);
@@ -894,10 +1253,15 @@ export default function TimetableSimple({ userData }) {
 
         {/* Message */}
         {message && (
-          <div className={`mt-4 p-3 rounded-lg ${message.includes('success') ? 'bg-green-50 text-green-700 border border-green-200' :
-            message.includes('Failed') ? 'bg-red-50 text-red-700 border border-red-200' :
-              'bg-blue-50 text-blue-700 border border-blue-200'
-            }`}>
+          <div
+            className={`mt-4 p-3 rounded-lg ${
+              message.includes("success")
+                ? "bg-green-50 text-green-700 border border-green-200"
+                : message.includes("Failed")
+                ? "bg-red-50 text-red-700 border border-red-200"
+                : "bg-blue-50 text-blue-700 border border-blue-200"
+            }`}
+          >
             {message}
           </div>
         )}
@@ -912,37 +1276,39 @@ export default function TimetableSimple({ userData }) {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Department</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Department
+            </label>
             <div className="w-full p-3 border border-blue-200 rounded-lg bg-blue-50">
               <div className="font-medium text-gray-800">
-                {timetable.department || (ccAssignment ? 'Loading...' : 'No CC Assignment')}
+                {timetable.department ||
+                  (ccAssignment ? "Loading..." : "No CC Assignment")}
               </div>
-
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Semester</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Semester
+            </label>
             <div className="w-full p-3 border border-blue-200 rounded-lg bg-blue-50">
               <div className="font-medium text-gray-800">
-                {timetable.semester || (ccAssignment ? 'Loading...' : 'No CC Assignment')}
+                {timetable.semester ||
+                  (ccAssignment ? "Loading..." : "No CC Assignment")}
               </div>
-
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Section</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Section
+            </label>
             <div className="w-full p-3 border border-blue-200 rounded-lg bg-blue-50">
               <div className="font-medium text-gray-800">
-                {timetable.section || (ccAssignment ? 'Loading...' : 'No CC Assignment')}
+                {timetable.section ||
+                  (ccAssignment ? "Loading..." : "No CC Assignment")}
               </div>
-
             </div>
           </div>
         </div>
-
-
-
-
       </div>
 
       {/* Action Buttons */}
@@ -959,6 +1325,19 @@ export default function TimetableSimple({ userData }) {
               Please wait while we load your CC assignment...
             </div>
           )}
+          {loadingStatus && (
+            <div
+              className={`text-sm px-3 py-1 rounded ${
+                loadingStatus.includes("success")
+                  ? "bg-green-100 text-green-700"
+                  : loadingStatus.includes("Failed")
+                  ? "bg-red-100 text-red-700"
+                  : "bg-blue-100 text-blue-700"
+              }`}
+            >
+              {loadingStatus}
+            </div>
+          )}
           {!loading && ccAssignment && !isEditing && (
             <>
               <button
@@ -968,6 +1347,16 @@ export default function TimetableSimple({ userData }) {
               >
                 <Edit3 className="h-4 w-4" />
                 Edit Timetable
+              </button>
+              <button
+                onClick={handleRefreshData}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                disabled={isLoading}
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+                />
+                {isLoading ? "Reloading..." : "Reload Subjects & Faculties"}
               </button>
               <button
                 onClick={initializeTimetable}
@@ -982,7 +1371,15 @@ export default function TimetableSimple({ userData }) {
                 className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
               >
                 <Clock className="h-4 w-4" />
-                {isEditingTimeSlots ? 'Done' : 'Manage Time Slots'}
+                {isEditingTimeSlots ? "Done" : "Manage Time Slots"}
+              </button>
+              <button
+                onClick={() => loadDepartmentData(ccAssignment?.department)}
+                className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                disabled={loading || !ccAssignment?.department}
+              >
+                <BookOpen className="h-4 w-4" />
+                Reload Subjects & Faculties
               </button>
               {currentTimetableId && (
                 <button
@@ -1004,7 +1401,7 @@ export default function TimetableSimple({ userData }) {
                 disabled={loading}
               >
                 <Save className="h-4 w-4" />
-                {loading ? 'Saving...' : 'Save Timetable'}
+                {loading ? "Saving..." : "Save Timetable"}
               </button>
               <button
                 onClick={() => setIsEditing(false)}
@@ -1018,74 +1415,189 @@ export default function TimetableSimple({ userData }) {
         </div>
       </div>
 
-      {/* Debug Panel - Show Faculty-Subject Mapping */}
-      {ccAssignment && isEditing && Object.keys(subjectFacultyMap).length > 0 && (
-        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">📋 Subject-Faculty Assignments (Debug)</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-            {Object.entries(subjectFacultyMap).map(([subject, faculties]) => (
-              <div key={subject} className="bg-white p-2 rounded border">
-                <div className="font-medium text-gray-800">{subject}</div>
-                <div className="text-gray-600 mt-1">
-                  {faculties.length > 0 ? (
-                    faculties.map(faculty => faculty.name || faculty.firstName || 'Unknown').join(', ')
-                  ) : (
-                    <span className="text-orange-600">No faculty assigned</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ADVANCED: Real-time Faculty Schedule Panel */}
-      {ccAssignment && isEditing && Object.keys(facultySchedules).length > 0 && (
-        <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-200">
-          <h3 className="text-sm font-semibold text-purple-800 mb-3">
-            🕒 Real-time Faculty Schedules (Cross-Class View)
+      {/* Debug Panel - Show Loading Status and Data */}
+      {ccAssignment && (
+        <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+          <h3 className="text-sm font-semibold text-yellow-700 mb-3">
+            🔧 Debug Information
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
-            {Object.entries(facultySchedules).slice(0, 6).map(([facultyName, schedules]) => (
-              <div key={facultyName} className="bg-white p-3 rounded border border-purple-100 shadow-sm">
-                <div className="font-medium text-purple-800 mb-2">👩‍🏫 {facultyName}</div>
-                <div className="space-y-1">
-                  {schedules
-                    .filter(s => !s.isCurrentTimetable) // Only show other classes
-                    .slice(0, 3)
-                    .map((schedule, idx) => (
-                      <div key={idx} className="text-xs">
-                        <div className="text-purple-700">
-                          📚 {schedule.subject}
-                        </div>
-                        <div className="text-purple-600">
-                          🕐 {schedule.day} {schedule.timeSlot}
-                        </div>
-                        <div className="text-purple-500 text-xs">
-                          🏫 {schedule.timetableInfo}
-                        </div>
-                        <hr className="my-1 border-purple-100" />
-                      </div>
-                    ))}
-                  {schedules.filter(s => !s.isCurrentTimetable).length === 0 && (
-                    <div className="text-green-600 text-xs">✅ No other classes assigned</div>
-                  )}
-                  {schedules.filter(s => !s.isCurrentTimetable).length > 3 && (
-                    <div className="text-purple-500 text-xs">
-                      ... and {schedules.filter(s => !s.isCurrentTimetable).length - 3} more classes
-                    </div>
-                  )}
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+            <div className="bg-white p-2 rounded border">
+              <div className="font-medium text-gray-800">CC Assignment</div>
+              <div className="text-gray-600 mt-1">
+                {ccAssignment
+                  ? `${ccAssignment.department} - Sem ${ccAssignment.semester} - Sec ${ccAssignment.section}`
+                  : "Not loaded"}
               </div>
-            ))}
+            </div>
+            <div className="bg-white p-2 rounded border">
+              <div className="font-medium text-gray-800">
+                Subjects ({subjects.length})
+              </div>
+              <div className="text-gray-600 mt-1">
+                {subjects.length > 0 ? (
+                  subjects
+                    .slice(0, 3)
+                    .map((s) => s.name)
+                    .join(", ") + (subjects.length > 3 ? "..." : "")
+                ) : (
+                  <span className="text-red-600">
+                    No subjects loaded - Click "Reload" button!
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="bg-white p-2 rounded border">
+              <div className="font-medium text-gray-800">
+                Faculties ({faculties.length})
+              </div>
+              <div className="text-gray-600 mt-1">
+                {faculties.length > 0 ? (
+                  faculties
+                    .slice(0, 2)
+                    .map((f) => f.name)
+                    .join(", ") + (faculties.length > 2 ? "..." : "")
+                ) : (
+                  <span className="text-red-600">No faculties loaded</span>
+                )}
+              </div>
+            </div>
           </div>
-          {Object.keys(facultySchedules).length > 6 && (
-            <div className="mt-3 text-center text-purple-600 text-xs">
-              Showing 6 of {Object.keys(facultySchedules).length} faculty schedules
+          <div className="mt-3 bg-white p-2 rounded border">
+            <div className="font-medium text-gray-800">
+              Subject-Faculty Assignments (
+              {Object.keys(subjectFacultyMap).length})
+            </div>
+            <div className="text-gray-600 mt-1">
+              {Object.keys(subjectFacultyMap).length > 0 ? (
+                Object.keys(subjectFacultyMap).slice(0, 3).join(", ") +
+                (Object.keys(subjectFacultyMap).length > 3 ? "..." : "")
+              ) : (
+                <span className="text-red-600">
+                  No subject-faculty assignments loaded - Data may be missing in
+                  database!
+                </span>
+              )}
+            </div>
+          </div>
+          {subjects.length === 0 && (
+            <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              <div className="text-orange-800 text-sm font-medium">
+                ⚠️ No subjects found! This could mean:
+              </div>
+              <ul className="text-orange-700 text-xs mt-1 ml-4 list-disc">
+                <li>
+                  Faculty-Department-Subject relationships not set up in
+                  database
+                </li>
+                <li>No subjects assigned to faculties in your department</li>
+                <li>API endpoint not responding correctly</li>
+              </ul>
+              <div className="text-orange-600 text-xs mt-2">
+                💡 Try clicking the "Reload Subjects & Faculties" button above
+                to retry loading.
+              </div>
             </div>
           )}
         </div>
       )}
+
+      {/* Debug Panel - Show Faculty-Subject Mapping */}
+      {ccAssignment &&
+        isEditing &&
+        Object.keys(subjectFacultyMap).length > 0 && (
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">
+              📋 Subject-Faculty Assignments (Debug)
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              {Object.entries(subjectFacultyMap).map(([subject, faculties]) => (
+                <div key={subject} className="bg-white p-2 rounded border">
+                  <div className="font-medium text-gray-800">{subject}</div>
+                  <div className="text-gray-600 mt-1">
+                    {faculties.length > 0 ? (
+                      faculties
+                        .map(
+                          (faculty) =>
+                            faculty.name || faculty.firstName || "Unknown"
+                        )
+                        .join(", ")
+                    ) : (
+                      <span className="text-orange-600">
+                        No faculty assigned
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+      {/* ADVANCED: Real-time Faculty Schedule Panel */}
+      {ccAssignment &&
+        isEditing &&
+        Object.keys(facultySchedules).length > 0 && (
+          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-200">
+            <h3 className="text-sm font-semibold text-purple-800 mb-3">
+              🕒 Real-time Faculty Schedules (Cross-Class View)
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+              {Object.entries(facultySchedules)
+                .slice(0, 6)
+                .map(([facultyName, schedules]) => (
+                  <div
+                    key={facultyName}
+                    className="bg-white p-3 rounded border border-purple-100 shadow-sm"
+                  >
+                    <div className="font-medium text-purple-800 mb-2">
+                      👩‍🏫 {facultyName}
+                    </div>
+                    <div className="space-y-1">
+                      {schedules
+                        .filter((s) => !s.isCurrentTimetable) // Only show other classes
+                        .slice(0, 3)
+                        .map((schedule, idx) => (
+                          <div key={idx} className="text-xs">
+                            <div className="text-purple-700">
+                              📚 {schedule.subject}
+                            </div>
+                            <div className="text-purple-600">
+                              🕐 {schedule.day} {schedule.timeSlot}
+                            </div>
+                            <div className="text-purple-500 text-xs">
+                              🏫 {schedule.timetableInfo}
+                            </div>
+                            <hr className="my-1 border-purple-100" />
+                          </div>
+                        ))}
+                      {schedules.filter((s) => !s.isCurrentTimetable).length ===
+                        0 && (
+                        <div className="text-green-600 text-xs">
+                          ✅ No other classes assigned
+                        </div>
+                      )}
+                      {schedules.filter((s) => !s.isCurrentTimetable).length >
+                        3 && (
+                        <div className="text-purple-500 text-xs">
+                          ... and{" "}
+                          {schedules.filter((s) => !s.isCurrentTimetable)
+                            .length - 3}{" "}
+                          more classes
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+            </div>
+            {Object.keys(facultySchedules).length > 6 && (
+              <div className="mt-3 text-center text-purple-600 text-xs">
+                Showing 6 of {Object.keys(facultySchedules).length} faculty
+                schedules
+              </div>
+            )}
+          </div>
+        )}
 
       {/* Time Slot Management */}
       {isEditingTimeSlots && (
@@ -1097,23 +1609,36 @@ export default function TimetableSimple({ userData }) {
 
           {/* Add New Time Slot */}
           <div className="mb-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
-            <h3 className="text-md font-semibold text-purple-800 mb-3">Add New Time Slot</h3>
+            <h3 className="text-md font-semibold text-purple-800 mb-3">
+              Add New Time Slot
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Start Time</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Start Time
+                </label>
                 <input
                   type="time"
                   value={newTimeSlot.start}
-                  onChange={(e) => setNewTimeSlot(prev => ({ ...prev, start: e.target.value }))}
+                  onChange={(e) =>
+                    setNewTimeSlot((prev) => ({
+                      ...prev,
+                      start: e.target.value,
+                    }))
+                  }
                   className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">End Time</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  End Time
+                </label>
                 <input
                   type="time"
                   value={newTimeSlot.end}
-                  onChange={(e) => setNewTimeSlot(prev => ({ ...prev, end: e.target.value }))}
+                  onChange={(e) =>
+                    setNewTimeSlot((prev) => ({ ...prev, end: e.target.value }))
+                  }
                   className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                 />
               </div>
@@ -1122,10 +1647,17 @@ export default function TimetableSimple({ userData }) {
                   <input
                     type="checkbox"
                     checked={newTimeSlot.isBreak}
-                    onChange={(e) => setNewTimeSlot(prev => ({ ...prev, isBreak: e.target.checked }))}
+                    onChange={(e) =>
+                      setNewTimeSlot((prev) => ({
+                        ...prev,
+                        isBreak: e.target.checked,
+                      }))
+                    }
                     className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                   />
-                  <span className="text-sm font-medium text-gray-700">Break Period</span>
+                  <span className="text-sm font-medium text-gray-700">
+                    Break Period
+                  </span>
                 </label>
               </div>
               <div>
@@ -1142,12 +1674,19 @@ export default function TimetableSimple({ userData }) {
 
           {/* Current Time Slots */}
           <div>
-            <h3 className="text-md font-semibold text-gray-800 mb-3">Current Time Slots</h3>
+            <h3 className="text-md font-semibold text-gray-800 mb-3">
+              Current Time Slots
+            </h3>
             <div className="space-y-2">
               {timeSlots.map((slot, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
+                >
                   <div className="flex items-center gap-3">
-                    <span className="font-medium text-gray-800">{slot.timeSlot}</span>
+                    <span className="font-medium text-gray-800">
+                      {slot.timeSlot}
+                    </span>
                     {slot.isBreak && (
                       <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
                         Break
@@ -1157,12 +1696,13 @@ export default function TimetableSimple({ userData }) {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => toggleBreakStatus(slot.timeSlot)}
-                      className={`px-3 py-1 rounded text-xs font-medium transition-colors ${slot.isBreak
-                        ? 'bg-blue-100 text-blue-800 hover:bg-blue-200'
-                        : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
-                        }`}
+                      className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                        slot.isBreak
+                          ? "bg-blue-100 text-blue-800 hover:bg-blue-200"
+                          : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+                      }`}
                     >
-                      {slot.isBreak ? 'Make Class' : 'Make Break'}
+                      {slot.isBreak ? "Make Class" : "Make Break"}
                     </button>
                     <button
                       onClick={() => removeTimeSlot(slot.timeSlot)}
@@ -1193,12 +1733,19 @@ export default function TimetableSimple({ userData }) {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className="border border-gray-300 p-3 text-left font-semibold text-gray-700">Day</th>
+                  <th className="border border-gray-300 p-3 text-left font-semibold text-gray-700">
+                    Day
+                  </th>
                   {timeSlots.map((slot, index) => (
-                    <th key={index} className="border border-gray-300 p-3 text-center font-semibold text-gray-700 min-w-[200px]">
+                    <th
+                      key={index}
+                      className="border border-gray-300 p-3 text-center font-semibold text-gray-700 min-w-[200px]"
+                    >
                       {slot.timeSlot}
                       {slot.isBreak && (
-                        <div className="text-xs text-yellow-600 mt-1">Break</div>
+                        <div className="text-xs text-yellow-600 mt-1">
+                          Break
+                        </div>
                       )}
                     </th>
                   ))}
@@ -1211,8 +1758,11 @@ export default function TimetableSimple({ userData }) {
                       {day.day}
                     </td>
                     {day.periods.map((period, periodIndex) => (
-                      <td key={periodIndex} className="border border-gray-300 p-2">
-                        {period.type === 'Break' ? (
+                      <td
+                        key={periodIndex}
+                        className="border border-gray-300 p-2"
+                      >
+                        {period.type === "Break" ? (
                           <div className="text-center py-4 bg-yellow-50 text-yellow-700 font-medium rounded">
                             BREAK
                           </div>
@@ -1220,7 +1770,14 @@ export default function TimetableSimple({ userData }) {
                           <div className="space-y-2">
                             <select
                               value={period.subject}
-                              onChange={(e) => updateCell(dayIndex, periodIndex, 'subject', e.target.value)}
+                              onChange={(e) =>
+                                updateCell(
+                                  dayIndex,
+                                  periodIndex,
+                                  "subject",
+                                  e.target.value
+                                )
+                              }
                               className="w-full p-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
                             >
                               <option value="">Select Subject</option>
@@ -1232,61 +1789,118 @@ export default function TimetableSimple({ userData }) {
                             </select>
                             <select
                               value={period.faculty}
-                              onChange={(e) => updateCell(dayIndex, periodIndex, 'faculty', e.target.value)}
+                              onChange={(e) =>
+                                updateCell(
+                                  dayIndex,
+                                  periodIndex,
+                                  "faculty",
+                                  e.target.value
+                                )
+                              }
                               className="w-full p-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
                               disabled={!period.subject}
                             >
                               <option value="">
-                                {period.subject ? 'Select Faculty' : 'Select Subject First'}
+                                {period.subject
+                                  ? "Select Faculty"
+                                  : "Select Subject First"}
                               </option>
-                              {period.subject && getAvailableFacultiesForSubject(period.subject, day.day, period.timeSlot).map((faculty, idx) => (
-                                <option key={idx} value={faculty.name}>
-                                  {faculty.name}
-                                  {faculty.scheduleInfo?.hasConflict ? ' (⚠️ Busy in other class)' : ''}
-                                </option>
-                              ))}
-                              {period.subject && getAvailableFacultiesForSubject(period.subject, day.day, period.timeSlot).length === 0 && (
-                                <option value="" disabled>No available faculty</option>
-                              )}
+                              {period.subject &&
+                                getAvailableFacultiesForSubject(
+                                  period.subject,
+                                  day.day,
+                                  period.timeSlot
+                                ).map((faculty, idx) => (
+                                  <option key={idx} value={faculty.name}>
+                                    {faculty.name}
+                                    {faculty.scheduleInfo?.hasConflict
+                                      ? " (⚠️ Busy in other class)"
+                                      : ""}
+                                  </option>
+                                ))}
+                              {period.subject &&
+                                getAvailableFacultiesForSubject(
+                                  period.subject,
+                                  day.day,
+                                  period.timeSlot
+                                ).length === 0 && (
+                                  <option value="" disabled>
+                                    No available faculty
+                                  </option>
+                                )}
                             </select>
 
                             {/* ADVANCED CONFLICT WARNINGS */}
-                            {period.subject && getAvailableFacultiesForSubject(period.subject, day.day, period.timeSlot).length === 0 && (
-                              <div className="text-xs text-red-600 mt-1 p-2 bg-red-50 rounded border border-red-200">
-                                🚫 <strong>All faculties busy:</strong> Every faculty assigned to teach "{period.subject}" is occupied in other classes at this time.
-                              </div>
-                            )}
+                            {period.subject &&
+                              getAvailableFacultiesForSubject(
+                                period.subject,
+                                day.day,
+                                period.timeSlot
+                              ).length === 0 && (
+                                <div className="text-xs text-red-600 mt-1 p-2 bg-red-50 rounded border border-red-200">
+                                  🚫 <strong>All faculties busy:</strong> Every
+                                  faculty assigned to teach "{period.subject}"
+                                  is occupied in other classes at this time.
+                                </div>
+                              )}
 
                             {/* Show specific conflict info for selected faculty */}
-                            {period.faculty && facultySchedules[period.faculty] && (
-                              <div className="text-xs mt-1 p-2 bg-blue-50 rounded border border-blue-200">
-                                <div className="font-medium text-blue-800">📅 {period.faculty}'s Schedule Info:</div>
-                                {facultySchedules[period.faculty]
-                                  .filter(schedule => schedule.day === day.day && schedule.timeSlot === period.timeSlot && !schedule.isCurrentTimetable)
-                                  .map((conflict, idx) => (
-                                    <div key={idx} className="text-blue-700 text-xs mt-1">
-                                      🏫 Teaching "{conflict.subject}" in {conflict.timetableInfo}
+                            {period.faculty &&
+                              facultySchedules[period.faculty] && (
+                                <div className="text-xs mt-1 p-2 bg-blue-50 rounded border border-blue-200">
+                                  <div className="font-medium text-blue-800">
+                                    📅 {period.faculty}'s Schedule Info:
+                                  </div>
+                                  {facultySchedules[period.faculty]
+                                    .filter(
+                                      (schedule) =>
+                                        schedule.day === day.day &&
+                                        schedule.timeSlot === period.timeSlot &&
+                                        !schedule.isCurrentTimetable
+                                    )
+                                    .map((conflict, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="text-blue-700 text-xs mt-1"
+                                      >
+                                        🏫 Teaching "{conflict.subject}" in{" "}
+                                        {conflict.timetableInfo}
+                                      </div>
+                                    ))}
+                                  {facultySchedules[period.faculty].filter(
+                                    (s) => !s.isCurrentTimetable
+                                  ).length === 0 && (
+                                    <div className="text-green-700 text-xs">
+                                      ✅ Free at this time slot
                                     </div>
-                                  ))
-                                }
-                                {facultySchedules[period.faculty].filter(s => !s.isCurrentTimetable).length === 0 && (
-                                  <div className="text-green-700 text-xs">✅ Free at this time slot</div>
-                                )}
-                              </div>
-                            )}
+                                  )}
+                                </div>
+                              )}
 
-                            {period.subject && subjectFacultyMap[period.subject]?.length === 0 && getAvailableFacultiesForSubject(period.subject, day.day, period.timeSlot).length === 0 && (
-                              <div className="text-xs text-yellow-600 mt-1 p-2 bg-yellow-50 rounded border border-yellow-200">
-                                ⚠️ <strong>No faculty assigned:</strong> No faculty has been assigned to teach this subject. Please contact admin.
-                              </div>
-                            )}
+                            {period.subject &&
+                              subjectFacultyMap[period.subject]?.length === 0 &&
+                              getAvailableFacultiesForSubject(
+                                period.subject,
+                                day.day,
+                                period.timeSlot
+                              ).length === 0 && (
+                                <div className="text-xs text-yellow-600 mt-1 p-2 bg-yellow-50 rounded border border-yellow-200">
+                                  ⚠️ <strong>No faculty assigned:</strong> No
+                                  faculty has been assigned to teach this
+                                  subject. Please contact admin.
+                                </div>
+                              )}
                           </div>
                         ) : (
                           <div className="text-center space-y-1">
                             {period.subject ? (
                               <>
-                                <div className="font-medium text-gray-800">{period.subject}</div>
-                                <div className="text-sm text-gray-600">{period.faculty}</div>
+                                <div className="font-medium text-gray-800">
+                                  {period.subject}
+                                </div>
+                                <div className="text-sm text-gray-600">
+                                  {period.faculty}
+                                </div>
                               </>
                             ) : (
                               <div className="text-gray-400 py-4">Empty</div>
@@ -1311,12 +1925,15 @@ export default function TimetableSimple({ userData }) {
               <div className="p-2 bg-red-100 rounded-full">
                 <Trash2 className="h-6 w-6 text-red-600" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900">Delete Timetable</h3>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Delete Timetable
+              </h3>
             </div>
 
             <div className="mb-6">
               <p className="text-gray-600 mb-3">
-                Are you sure you want to delete this timetable? This action cannot be undone.
+                Are you sure you want to delete this timetable? This action
+                cannot be undone.
               </p>
               <div className="bg-gray-50 p-3 rounded-lg border">
                 <div className="text-sm text-gray-700">

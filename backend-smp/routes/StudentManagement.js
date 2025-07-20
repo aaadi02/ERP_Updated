@@ -13,7 +13,19 @@ const router = express.Router();
 const execPromise = util.promisify(exec);
 
 // Configure multer for file uploads
-const upload = multer({ dest: "uploads/" });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 2 * 1024 * 1024, // 2MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === "image/jpeg" || file.mimetype === "image/png") {
+      cb(null, true);
+    } else {
+      cb(new Error("Only JPEG and PNG files are allowed"), false);
+    }
+  },
+});
 
 // Add authentication middleware to all routes
 router.use(protect);
@@ -27,26 +39,29 @@ router.get("/test", (req, res) => {
 router.get("/all", async (req, res) => {
   try {
     const students = await Student.find({}).populate("department", "name");
-    
+
     // Create department-wise breakdown
     const departmentWise = {};
-    students.forEach(student => {
-      const deptName = student.department?.name || student.department || "Unknown";
+    students.forEach((student) => {
+      const deptName =
+        student.department?.name || student.department || "Unknown";
       if (!departmentWise[deptName]) {
         departmentWise[deptName] = 0;
       }
       departmentWise[deptName]++;
     });
 
-    const departmentWiseArray = Object.entries(departmentWise).map(([name, count]) => ({
-      name,
-      count
-    }));
+    const departmentWiseArray = Object.entries(departmentWise).map(
+      ([name, count]) => ({
+        name,
+        count,
+      })
+    );
 
-    res.json({ 
-      students, 
+    res.json({
+      students,
       total: students.length,
-      departmentWise: departmentWiseArray
+      departmentWise: departmentWiseArray,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -63,9 +78,14 @@ router.get("/", async (req, res) => {
     if (lastName) query.lastName = new RegExp(lastName.trim(), "i");
     if (enrollmentNumber) query.enrollmentNumber = enrollmentNumber.trim();
     if (admissionType) {
-      if (!["Regular", "Direct Second Year", "Lateral Entry"].includes(admissionType)) {
+      if (
+        !["Regular", "Direct Second Year", "Lateral Entry"].includes(
+          admissionType
+        )
+      ) {
         return res.status(400).json({
-          error: "Invalid admissionType. Must be Regular, Direct Second Year, or Lateral Entry",
+          error:
+            "Invalid admissionType. Must be Regular, Direct Second Year, or Lateral Entry",
         });
       }
       query.admissionType = admissionType;
@@ -122,6 +142,10 @@ router.get("/", async (req, res) => {
 // CREATE Student Admission
 router.post("/", upload.single("photo"), async (req, res) => {
   try {
+    console.log("Received POST request to create student");
+    console.log("Request body:", req.body);
+    console.log("File:", req.file ? "File uploaded" : "No file uploaded");
+
     const {
       firstName,
       middleName,
@@ -156,30 +180,46 @@ router.post("/", upload.single("photo"), async (req, res) => {
     } = req.body;
 
     // Validate required fields
-    if (!firstName || !middleName || !lastName || !mobileNumber) {
-      return res.status(400).json({ error: "Missing required fields: firstName, middleName, lastName, mobileNumber" });
+    if (!firstName || !lastName || !mobileNumber) {
+      return res
+        .status(400)
+        .json({
+          error: "Missing required fields: firstName, lastName, mobileNumber",
+        });
     }
 
     if (subjects && (!Array.isArray(subjects) || subjects.length === 0)) {
-      return res.status(400).json({ error: "Subjects must be a non-empty array" });
+      return res
+        .status(400)
+        .json({ error: "Subjects must be a non-empty array" });
     }
 
-    if (admissionType && !["Regular", "Direct Second Year", "Lateral Entry"].includes(admissionType)) {
+    if (
+      admissionType &&
+      !["Regular", "Direct Second Year", "Lateral Entry"].includes(
+        admissionType
+      )
+    ) {
       return res.status(400).json({
-        error: "Invalid admissionType. Must be Regular, Direct Second Year, or Lateral Entry",
+        error:
+          "Invalid admissionType. Must be Regular, Direct Second Year, or Lateral Entry",
       });
     }
 
     // Validate abcId if provided
     if (abcId && !/^\d{12}$/.test(abcId)) {
-      return res.status(400).json({ error: "ABC ID must be a 12-digit number" });
+      return res
+        .status(400)
+        .json({ error: "ABC ID must be a 12-digit number" });
     }
 
     // Handle photo upload to Cloudinary
     let photoUrl = "";
     if (req.file) {
       const result = await cloudinary.uploader.upload(
-        `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`,
+        `data:${req.file.mimetype};base64,${req.file.buffer.toString(
+          "base64"
+        )}`,
         {
           folder: "students",
         }
@@ -189,17 +229,22 @@ router.post("/", upload.single("photo"), async (req, res) => {
 
     // Validate semester and subjects if provided
     if (semester && subjects) {
-      const semesterDoc = await Semester.findById(semester).populate("subjects");
+      const semesterDoc = await Semester.findById(semester).populate(
+        "subjects"
+      );
       if (!semesterDoc) {
         return res.status(400).json({ error: "Invalid semester ID" });
       }
 
       const validSubjects = semesterDoc.subjects
-        .filter((sub) => sub.department && String(sub.department) === department)
+        .filter(
+          (sub) => sub.department && String(sub.department) === department
+        )
         .map((sub) => String(sub._id));
       if (!subjects.every((subId) => validSubjects.includes(String(subId)))) {
         return res.status(400).json({
-          error: "One or more subject IDs are not valid for this semester and department",
+          error:
+            "One or more subject IDs are not valid for this semester and department",
         });
       }
     }
@@ -236,23 +281,47 @@ router.post("/", upload.single("photo"), async (req, res) => {
       nameOfInstitute,
       abcId,
       photo: photoUrl || undefined,
-      semesterRecords: semester && subjects ? [
-        {
-          semester,
-          subjects: subjects.map((sub) => ({
-            subject: sub,
-            status: "Pending",
-            marks: 0,
-          })),
-          isBacklog: false,
-        },
-      ] : [],
+      semesterRecords:
+        semester && subjects
+          ? [
+              {
+                semester,
+                subjects: subjects.map((sub) => ({
+                  subject: sub,
+                  status: "Pending",
+                  marks: 0,
+                })),
+                isBacklog: false,
+              },
+            ]
+          : [],
     });
 
     await student.save();
+    console.log("Student created successfully:", student._id);
     res.status(201).json(student);
   } catch (err) {
     console.error("Error creating student:", err);
+
+    // Handle validation errors
+    if (err.name === "ValidationError") {
+      const validationErrors = Object.values(err.errors).map(
+        (error) => error.message
+      );
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationErrors,
+      });
+    }
+
+    // Handle duplicate key errors
+    if (err.code === 11000) {
+      const duplicateField = Object.keys(err.keyPattern)[0];
+      return res.status(400).json({
+        error: `${duplicateField} already exists`,
+      });
+    }
+
     res.status(500).json({ error: err.message });
   }
 });
@@ -260,19 +329,21 @@ router.post("/", upload.single("photo"), async (req, res) => {
 // Debug route to list all student identifiers
 router.get("/debug/list-identifiers", async (req, res) => {
   try {
-    const students = await Student.find({}, 'enrollmentNumber studentId firstName lastName')
-      .limit(10);
-    
-    const identifiers = students.map(student => ({
+    const students = await Student.find(
+      {},
+      "enrollmentNumber studentId firstName lastName"
+    ).limit(10);
+
+    const identifiers = students.map((student) => ({
       _id: student._id,
       enrollmentNumber: student.enrollmentNumber,
       studentId: student.studentId,
-      name: `${student.firstName} ${student.lastName}`
+      name: `${student.firstName} ${student.lastName}`,
     }));
-    
+
     res.json({
       count: students.length,
-      identifiers: identifiers
+      identifiers: identifiers,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -295,30 +366,30 @@ router.get("/enrollment/:enrollmentNumber", async (req, res) => {
   try {
     const { enrollmentNumber } = req.params;
     const searchTerm = decodeURIComponent(enrollmentNumber).trim();
-    
+
     console.log("Searching for student with identifier:", searchTerm);
-    
+
     // Try multiple search criteria
     const searchQueries = [
       { enrollmentNumber: searchTerm },
       { studentId: searchTerm },
-      { enrollmentNumber: new RegExp(searchTerm, 'i') },
-      { studentId: new RegExp(searchTerm, 'i') }
+      { enrollmentNumber: new RegExp(searchTerm, "i") },
+      { studentId: new RegExp(searchTerm, "i") },
     ];
-    
+
     let student = null;
-    
+
     // Try each search query until we find a match
     for (const query of searchQueries) {
       student = await Student.findOne(query)
         .populate("stream")
-        .populate("department") 
+        .populate("department")
         .populate("semester")
         .populate("semesterRecords.semester")
         .populate("semesterRecords.subjects.subject")
         .populate("backlogs.subject")
         .populate("backlogs.semester");
-      
+
       if (student) {
         console.log("Found student with query:", query);
         break;
@@ -327,10 +398,10 @@ router.get("/enrollment/:enrollmentNumber", async (req, res) => {
 
     if (!student) {
       console.log("Student not found with any search criteria");
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: "Student not found",
         searchTerm: searchTerm,
-        message: `No student found with enrollment number or student ID: ${searchTerm}`
+        message: `No student found with enrollment number or student ID: ${searchTerm}`,
       });
     }
 
@@ -341,7 +412,10 @@ router.get("/enrollment/:enrollmentNumber", async (req, res) => {
       backlogs: student.backlogs || [],
     };
 
-    console.log("Returning student data for:", cleanedStudent.enrollmentNumber || cleanedStudent.studentId);
+    console.log(
+      "Returning student data for:",
+      cleanedStudent.enrollmentNumber || cleanedStudent.studentId
+    );
     res.json(cleanedStudent);
   } catch (err) {
     console.error("Error fetching student by enrollment number:", err);
@@ -379,34 +453,36 @@ router.get("/:id", async (req, res) => {
 // UPDATE Student Info
 router.put("/:id", upload.single("photo"), async (req, res) => {
   try {
-    const {
-      semesterRecords,
-      admissionType,
-      abcId,
-      ...updateFields
-    } = req.body;
+    const { semesterRecords, admissionType, abcId, ...updateFields } = req.body;
 
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ error: "Student not found" });
 
     if (
       admissionType &&
-      !["Regular", "Direct Second Year", "Lateral Entry"].includes(admissionType)
+      !["Regular", "Direct Second Year", "Lateral Entry"].includes(
+        admissionType
+      )
     ) {
       return res.status(400).json({
-        error: "Invalid admissionType. Must be Regular, Direct Second Year, or Lateral Entry",
+        error:
+          "Invalid admissionType. Must be Regular, Direct Second Year, or Lateral Entry",
       });
     }
 
     // Validate abcId if provided
     if (abcId && !/^\d{12}$/.test(abcId)) {
-      return res.status(400).json({ error: "ABC ID must be a 12-digit number" });
+      return res
+        .status(400)
+        .json({ error: "ABC ID must be a 12-digit number" });
     }
 
     // Handle photo upload to Cloudinary
     if (req.file) {
       const result = await cloudinary.uploader.upload(
-        `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`,
+        `data:${req.file.mimetype};base64,${req.file.buffer.toString(
+          "base64"
+        )}`,
         {
           folder: "students",
         }
@@ -427,7 +503,9 @@ router.put("/:id", upload.single("photo"), async (req, res) => {
             .json({ error: "Semester ID is required in semesterRecords" });
         }
 
-        const semester = await Semester.findById(semesterId).populate("subjects");
+        const semester = await Semester.findById(semesterId).populate(
+          "subjects"
+        );
         if (!semester) {
           return res
             .status(400)
@@ -435,8 +513,10 @@ router.put("/:id", upload.single("photo"), async (req, res) => {
         }
 
         if (record.subjects && Array.isArray(record.subjects)) {
-          const validSubjectIds = semester.subjects ? semester.subjects.map((sub) => String(sub._id)) : [];
-          
+          const validSubjectIds = semester.subjects
+            ? semester.subjects.map((sub) => String(sub._id))
+            : [];
+
           const subjectIds = record.subjects
             .map((sub) => {
               const subjectId = sub.subject?._id || sub.subject;
@@ -444,11 +524,14 @@ router.put("/:id", upload.single("photo"), async (req, res) => {
             })
             .filter(Boolean); // This will filter out null, undefined, and empty values
 
-          if (validSubjectIds.length > 0 && !subjectIds.every((id) => validSubjectIds.includes(String(id)))) {
+          if (
+            validSubjectIds.length > 0 &&
+            !subjectIds.every((id) => validSubjectIds.includes(String(id)))
+          ) {
             return res.status(400).json({
               error: "One or more subject IDs are invalid for this semester",
               validSubjectIds,
-              providedSubjectIds: subjectIds
+              providedSubjectIds: subjectIds,
             });
           }
 
@@ -464,7 +547,8 @@ router.put("/:id", upload.single("photo"), async (req, res) => {
               const mappedSubject = {
                 subject: sub.subject?._id || sub.subject,
                 status: sub.status || "Pending",
-                marks: sub.status === "Passed" ? sub.marks || 50 : sub.marks || 0,
+                marks:
+                  sub.status === "Passed" ? sub.marks || 50 : sub.marks || 0,
               };
               return mappedSubject;
             });
@@ -476,7 +560,11 @@ router.put("/:id", upload.single("photo"), async (req, res) => {
       student.semesterRecords = semesterRecords;
 
       const latestRecord = semesterRecords[semesterRecords.length - 1];
-      if (latestRecord && latestRecord.subjects && Array.isArray(latestRecord.subjects)) {
+      if (
+        latestRecord &&
+        latestRecord.subjects &&
+        Array.isArray(latestRecord.subjects)
+      ) {
         student.subjects = latestRecord.subjects
           .filter((sub) => sub.status === "Pending")
           .map((sub) => sub.subject);
@@ -488,10 +576,10 @@ router.put("/:id", upload.single("photo"), async (req, res) => {
       res.json(student);
     } catch (saveError) {
       console.error("Error saving student:", saveError);
-      return res.status(500).json({ 
-        error: "Failed to save student", 
+      return res.status(500).json({
+        error: "Failed to save student",
         details: saveError.message,
-        validationErrors: saveError.errors 
+        validationErrors: saveError.errors,
       });
     }
   } catch (err) {
@@ -531,7 +619,8 @@ router.put("/promote/:id", async (req, res) => {
     const currentSemesterNumber = student.semester?.number;
     if (!currentSemesterNumber || currentSemesterNumber >= 8) {
       return res.status(400).json({
-        error: "Student is already in the final semester or has no current semester",
+        error:
+          "Student is already in the final semester or has no current semester",
       });
     }
 
@@ -539,7 +628,9 @@ router.put("/promote/:id", async (req, res) => {
       number: currentSemesterNumber + 1,
     }).populate("subjects");
     if (!nextSemester) {
-      return res.status(404).json({ error: "Next semester not found in database" });
+      return res
+        .status(404)
+        .json({ error: "Next semester not found in database" });
     }
 
     const nextSemesterSubjects = nextSemester.subjects
@@ -587,7 +678,9 @@ router.put("/edit-semester/:id", async (req, res) => {
     }
 
     if (String(student.semester) === String(semesterId)) {
-      return res.status(400).json({ error: "Student is already in the selected semester" });
+      return res
+        .status(400)
+        .json({ error: "Student is already in the selected semester" });
     }
 
     const semesterSubjects = semester.subjects
@@ -641,10 +734,13 @@ router.post("/:id/add-backlog", async (req, res) => {
     if (!student) return res.status(404).json({ error: "Student not found" });
 
     const semester = await Semester.findById(semesterId).populate("subjects");
-    if (!semester) return res.status(400).json({ error: "Invalid semester ID" });
+    if (!semester)
+      return res.status(400).json({ error: "Invalid semester ID" });
 
     if (!Array.isArray(subjectIds) || subjectIds.length === 0) {
-      return res.status(400).json({ error: "subjectIds must be a non-empty array" });
+      return res
+        .status(400)
+        .json({ error: "subjectIds must be a non-empty array" });
     }
     const validSubjectIds = semester.subjects.map((sub) => String(sub._id));
     if (!subjectIds.every((id) => validSubjectIds.includes(String(id)))) {
@@ -689,7 +785,9 @@ router.put("/:id/update-backlog/:backlogId", async (req, res) => {
     if (!backlog) return res.status(404).json({ error: "Backlog not found" });
 
     if (!["Pending", "Cleared"].includes(status)) {
-      return res.status(400).json({ error: "Invalid status. Use Pending or Cleared" });
+      return res
+        .status(400)
+        .json({ error: "Invalid status. Use Pending or Cleared" });
     }
 
     backlog.status = status;
@@ -747,59 +845,112 @@ router.post("/generate-certificate/:id", async (req, res) => {
 
     // Validate inputs for all certificate types
     if (!type || !["TC", "LC", "BC"].includes(type)) {
-      return res.status(400).json({ error: "Invalid certificate type. Must be TC, LC, or BC" });
+      return res
+        .status(400)
+        .json({ error: "Invalid certificate type. Must be TC, LC, or BC" });
     }
     if (!purpose && !reason) {
       return res.status(400).json({ error: "Purpose or reason is required" });
     }
     if (type !== "BC" && !leavingDate) {
-      return res.status(400).json({ error: "Leaving date is required for TC and LC" });
+      return res
+        .status(400)
+        .json({ error: "Leaving date is required for TC and LC" });
     }
     const leavingDateObj = leavingDate ? new Date(leavingDate) : null;
     if (leavingDate && isNaN(leavingDateObj.getTime())) {
       return res.status(400).json({ error: "Invalid leaving date" });
     }
     if (type === "LC" && !completionStatus) {
-      return res.status(400).json({ error: "Completion status required for Leaving Certificate" });
+      return res
+        .status(400)
+        .json({ error: "Completion status required for Leaving Certificate" });
     }
-    if (type === "LC" && !["Completed", "Incomplete", "Withdrawn"].includes(completionStatus)) {
+    if (
+      type === "LC" &&
+      !["Completed", "Incomplete", "Withdrawn"].includes(completionStatus)
+    ) {
       return res.status(400).json({
-        error: "Completion status must be Completed, Incomplete, or Withdrawn for LC",
+        error:
+          "Completion status must be Completed, Incomplete, or Withdrawn for LC",
       });
     }
-    if (!student.firstName || !student.middleName || !student.lastName || !student.mobileNumber) {
+    if (
+      !student.firstName ||
+      !student.middleName ||
+      !student.lastName ||
+      !student.mobileNumber
+    ) {
       return res.status(400).json({
-        error: "Student record missing required fields: firstName, middleName, lastName, or mobileNumber",
+        error:
+          "Student record missing required fields: firstName, middleName, lastName, or mobileNumber",
       });
     }
 
     // Common student data
-    const fullName = `${student.firstName} ${student.middleName || ""} ${student.lastName || ""}`.trim();
+    const fullName = `${student.firstName} ${student.middleName || ""} ${
+      student.lastName || ""
+    }`.trim();
 
     // If no LaTeX template is provided, return JSON data
-    if (!latexTemplate || typeof latexTemplate !== "string" || !latexTemplate.includes("\\documentclass")) {
+    if (
+      !latexTemplate ||
+      typeof latexTemplate !== "string" ||
+      !latexTemplate.includes("\\documentclass")
+    ) {
       const responseData = {
         type,
         student: {
           fullName,
-          enrollmentNumber: student.enrollmentNumber || data?.enrollmentNumber || "N/A",
+          enrollmentNumber:
+            student.enrollmentNumber || data?.enrollmentNumber || "N/A",
           motherName: student.motherName || data?.motherName || "Not Available",
           casteCategory: student.casteCategory || data?.casteCategory || "N/A",
           subCaste: student.subCaste || data?.caste || "N/A",
-          nationality: data?.nationality || student.nationality || "Not Available",
-          placeOfBirth: data?.placeOfBirth || student.placeOfBirth || "Not Available",
-          dateOfBirth: data?.dateOfBirth || (student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString('en-GB') : "Not Available"),
-          dateOfBirthWords: data?.dateOfBirthWords || student.dateOfBirthInWords || "Not Available",
-          course: data?.course || `${student.stream?.name || 'B.Tech'} in ${student.department?.name || 'Engineering'}`,
-          semesterNumber: data?.semesterNumber || student.semester?.number || "N/A",
-          year: data?.year || (data?.semesterNumber ? Math.ceil(data.semesterNumber / 2) : (student.semester?.number ? Math.ceil(student.semester.number / 2) : "N/A")),
-          session: data?.session || `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
-          dateOfAdmission: data?.dateOfAdmission || (student.admissionDate ? new Date(student.admissionDate).toLocaleDateString('en-GB') : "Not Available"),
-          lastSchoolAttended: data?.lastSchoolAttended || student.schoolAttended || "Not Available",
+          nationality:
+            data?.nationality || student.nationality || "Not Available",
+          placeOfBirth:
+            data?.placeOfBirth || student.placeOfBirth || "Not Available",
+          dateOfBirth:
+            data?.dateOfBirth ||
+            (student.dateOfBirth
+              ? new Date(student.dateOfBirth).toLocaleDateString("en-GB")
+              : "Not Available"),
+          dateOfBirthWords:
+            data?.dateOfBirthWords ||
+            student.dateOfBirthInWords ||
+            "Not Available",
+          course:
+            data?.course ||
+            `${student.stream?.name || "B.Tech"} in ${
+              student.department?.name || "Engineering"
+            }`,
+          semesterNumber:
+            data?.semesterNumber || student.semester?.number || "N/A",
+          year:
+            data?.year ||
+            (data?.semesterNumber
+              ? Math.ceil(data.semesterNumber / 2)
+              : student.semester?.number
+              ? Math.ceil(student.semester.number / 2)
+              : "N/A"),
+          session:
+            data?.session ||
+            `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
+          dateOfAdmission:
+            data?.dateOfAdmission ||
+            (student.admissionDate
+              ? new Date(student.admissionDate).toLocaleDateString("en-GB")
+              : "Not Available"),
+          lastSchoolAttended:
+            data?.lastSchoolAttended ||
+            student.schoolAttended ||
+            "Not Available",
           progress: data?.progress || progress || "Satisfactory",
           conduct: data?.conduct || conduct || "Good",
           seatNumber: data?.seatNumber || student.enrollmentNumber || "N/A",
-          dateOfIssue: data?.dateOfIssue || new Date().toLocaleDateString('en-GB'),
+          dateOfIssue:
+            data?.dateOfIssue || new Date().toLocaleDateString("en-GB"),
           hasBacklogs: student.backlogs && student.backlogs.length > 0,
           abcId: student.abcId || data?.abcId || "N/A",
           photo: student.photo || data?.photo || "Not Available",
@@ -819,7 +970,8 @@ router.post("/generate-certificate/:id", async (req, res) => {
       (typeof isCleared !== "boolean" || !progress || !conduct)
     ) {
       return res.status(400).json({
-        error: "Missing required fields: isCleared, progress, conduct for TC or LC PDF",
+        error:
+          "Missing required fields: isCleared, progress, conduct for TC or LC PDF",
       });
     }
 
@@ -849,7 +1001,9 @@ router.post("/generate-certificate/:id", async (req, res) => {
         stderr: latexErr.stderr,
         stdout: latexErr.stdout,
       });
-      return res.status(500).json({ error: "Failed to compile LaTeX template" });
+      return res
+        .status(500)
+        .json({ error: "Failed to compile LaTeX template" });
     }
 
     // Check if PDF was generated
@@ -861,7 +1015,10 @@ router.post("/generate-certificate/:id", async (req, res) => {
     const pdfBuffer = fs.readFileSync(pdfFile);
     res.set({
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename=${type}_${fullName.replace(/\s+/g, "_")}.pdf`,
+      "Content-Disposition": `attachment; filename=${type}_${fullName.replace(
+        /\s+/g,
+        "_"
+      )}.pdf`,
       "Content-Length": pdfBuffer.length,
     });
 
@@ -931,3 +1088,4 @@ router.patch("/:id/toggle-access", async (req, res) => {
 });
 
 export default router;
+

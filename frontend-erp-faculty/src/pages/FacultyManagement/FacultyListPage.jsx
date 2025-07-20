@@ -127,18 +127,21 @@ export default function FacultyDashboard() {
       try {
         const result = await fetchDepartments();
         if (result.success) {
-          console.log('Academic departments fetched for HOD assignment:', result.departments);
+          console.log(
+            "Academic departments fetched for HOD assignment:",
+            result.departments
+          );
           setAcademicDepartments(result.departments);
         } else {
-          console.error('Failed to fetch academic departments:', result.error);
+          console.error("Failed to fetch academic departments:", result.error);
           setAcademicDepartments([]);
         }
       } catch (error) {
-        console.error('Error fetching academic departments:', error);
+        console.error("Error fetching academic departments:", error);
         setAcademicDepartments([]);
       }
     };
-    
+
     loadAcademicDepartments();
   }, []);
 
@@ -218,7 +221,7 @@ export default function FacultyDashboard() {
 
   const handleAssignFormSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.facultyId) {
       alert("Please select a faculty member.");
       return;
@@ -242,7 +245,10 @@ export default function FacultyDashboard() {
     // Prevent multiple HODs in one department
     if (formData.role === "hod") {
       const alreadyHod = faculties.find(
-        (f) => f.department === selectedDepartment && f.role === "hod" && f._id !== formData.facultyId
+        (f) =>
+          f.department === selectedDepartment &&
+          f.role === "hod" &&
+          f._id !== formData.facultyId
       );
       if (alreadyHod) {
         alert(
@@ -266,7 +272,9 @@ export default function FacultyDashboard() {
 
       // Additional validation for Principal - should not already be HOD
       if (selectedFacultyForAssignment.role === "hod") {
-        alert("This faculty member is already assigned as HOD. A person cannot be both HOD and Principal.");
+        alert(
+          "This faculty member is already assigned as HOD. A person cannot be both HOD and Principal."
+        );
         return;
       }
 
@@ -402,7 +410,9 @@ export default function FacultyDashboard() {
 
   const handleRemovePrincipal = async (facultyId) => {
     try {
-      const confirmRemoval = window.confirm("Are you sure you want to remove this Principal?");
+      const confirmRemoval = window.confirm(
+        "Are you sure you want to remove this Principal?"
+      );
       if (!confirmRemoval) return;
 
       const response = await fetch(
@@ -423,7 +433,7 @@ export default function FacultyDashboard() {
           f._id === facultyId ? { ...f, role: null, type: "teaching" } : f
         )
       );
-      
+
       // Update principal history if needed
       setPrincipalHistory((prev) => [
         ...prev,
@@ -433,7 +443,7 @@ export default function FacultyDashboard() {
           reason: "Removed from Principal role",
         },
       ]);
-      
+
       alert("Principal removed successfully");
     } catch (err) {
       console.error("Remove Principal error:", err);
@@ -610,28 +620,30 @@ export default function FacultyDashboard() {
               .filter((faculty) => {
                 // Only show teaching faculty
                 if (faculty.type !== "teaching") return false;
-                
+
                 // For HOD assignment, filter by department and exclude current HODs of that department
                 if (formData.role === "hod") {
                   if (faculty.department !== selectedDepartment) return false;
                   if (faculty.role === "hod") return false;
                 }
-                
+
                 // For Principal assignment, exclude current principals and HODs
                 if (formData.role === "principal") {
-                  if (faculty.role === "principal" || faculty.role === "hod") return false;
+                  if (faculty.role === "principal" || faculty.role === "hod")
+                    return false;
                 }
-                
+
                 return true;
               })
               .map((faculty) => (
                 <option key={faculty._id} value={faculty._id}>
-                  {faculty.firstName} ({faculty.employeeId}) - {faculty.department}
+                  {faculty.firstName} ({faculty.employeeId}) -{" "}
+                  {faculty.department}
                 </option>
               ))}
           </select>
           <p className="text-xs text-slate-500 mt-1">
-            {formData.role === "hod" 
+            {formData.role === "hod"
               ? `Only teaching faculty from ${selectedDepartment} department are shown`
               : "Only teaching faculty (excluding current HODs) are shown"}
           </p>
@@ -642,13 +654,12 @@ export default function FacultyDashboard() {
           </label>
           <textarea
             required
-            value={formData.reason}
-            onChange={(e) =>
-              setFormData({ ...formData, reason: e.target.value })
-            }
+            defaultValue={formData.reason}
+            onBlur={(e) => setFormData({ ...formData, reason: e.target.value })}
             className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
             rows="3"
             disabled={formLoading}
+            placeholder="Enter the reason for this assignment..."
           />
         </div>
         <div>
@@ -671,13 +682,12 @@ export default function FacultyDashboard() {
             Notes (Optional)
           </label>
           <textarea
-            value={formData.notes}
-            onChange={(e) =>
-              setFormData({ ...formData, notes: e.target.value })
-            }
+            defaultValue={formData.notes}
+            onBlur={(e) => setFormData({ ...formData, notes: e.target.value })}
             className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
             rows="2"
             disabled={formLoading}
+            placeholder="Optional notes about the assignment..."
           />
         </div>
         <div className="flex justify-end gap-3">

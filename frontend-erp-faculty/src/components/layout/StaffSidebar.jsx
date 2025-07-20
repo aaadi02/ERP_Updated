@@ -107,7 +107,8 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
     if (role === "HOD") return "/dashboard/compose-hod-announcement";
     if (role === "principal")
       return "/dashboard/compose-principal-announcement";
-    if (role === "nonteaching" || role === "non-teaching") return "/dashboard/announcementnonteaching";
+    if (role === "nonteaching" || role === "non-teaching")
+      return "/dashboard/announcementnonteaching";
     return "/dashboard/announcement";
   };
 
@@ -141,7 +142,7 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
       href: getDashboardRoute(userData?.role),
       routeName: userData?.role === "cc" ? "cc_dashboard" : "dashboard",
       isSection: true,
-      sectionTitle: "Main"
+      sectionTitle: "Main",
     },
 
     // Personal Section
@@ -151,7 +152,7 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
       href: "/dashboard/profile",
       routeName: "profile",
       isSection: true,
-      sectionTitle: "Personal"
+      sectionTitle: "Personal",
     },
     {
       title: "Pay Slip",
@@ -160,43 +161,45 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
       routeName: "payslip",
     },
     // Staff Management Section
-    ...(userData?.role === "HOD" ? [
-      {
-        title: "Department Faculty",
-        icon: <Users size={20} />,
-        href: "/dashboard/departmentfaculty",
-        routeName: "all_staff",
-        isSection: true,
-        sectionTitle: "Staff Management"
-      },
-      {
-        title: "Department Students",
-        icon: <Users size={20} />,
-        href: "/dashboard/department-students",
-        routeName: "department_students",
-      },
-      {
-        title: "Academic Calendar",
-        icon: <Calendar size={20} />,
-        href: "/dashboard/academic-calendar",
-        routeName: "academic_calendar",
-      },
-    ] : [
-      {
-        title: "All Staff",
-        icon: <BookOpen size={20} />,
-        href: getAllStaffRoute(userData?.role),
-        routeName: "all_staff",
-        isSection: true,
-        sectionTitle: "Staff Management"
-      },
-      {
-        title: "Department Students",
-        icon: <Users size={20} />,
-        href: "/dashboard/department-students",
-        routeName: "department_students",
-      },
-    ]),
+    ...(userData?.role === "HOD"
+      ? [
+          {
+            title: "Department Faculty",
+            icon: <Users size={20} />,
+            href: "/dashboard/departmentfaculty",
+            routeName: "all_staff",
+            isSection: true,
+            sectionTitle: "Staff Management",
+          },
+          {
+            title: "Department Students",
+            icon: <Users size={20} />,
+            href: "/dashboard/department-students",
+            routeName: "department_students",
+          },
+          {
+            title: "Academic Calendar",
+            icon: <Calendar size={20} />,
+            href: "/dashboard/academic-calendar",
+            routeName: "academic_calendar",
+          },
+        ]
+      : [
+          {
+            title: "All Staff",
+            icon: <BookOpen size={20} />,
+            href: getAllStaffRoute(userData?.role),
+            routeName: "all_staff",
+            isSection: true,
+            sectionTitle: "Staff Management",
+          },
+          {
+            title: "Department Students",
+            icon: <Users size={20} />,
+            href: "/dashboard/department-students",
+            routeName: "department_students",
+          },
+        ]),
     // Communication Section
     {
       title: getAnnouncementTitle(userData?.role),
@@ -207,21 +210,24 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
           ? "compose_hod_announcement"
           : userData?.role === "principal"
           ? "compose_principal_announcement"
-          : userData?.role === "nonteaching" || userData?.role === "non-teaching"
+          : userData?.role === "nonteaching" ||
+            userData?.role === "non-teaching"
           ? "announcement_nonteaching"
           : "announcement",
       isSection: true,
       sectionTitle: "Communication",
     },
     // Student Feedback for HOD
-    ...(userData?.role === "HOD" ? [
-      {
-        title: "Student Feedback",
-        icon: <MessageCircle size={20} />,
-        href: "/dashboard/student-feedback",
-        routeName: "student_feedback",
-      },
-    ] : []),
+    ...(userData?.role === "HOD"
+      ? [
+          {
+            title: "Student Feedback",
+            icon: <MessageCircle size={20} />,
+            href: "/dashboard/student-feedback",
+            routeName: "student_feedback",
+          },
+        ]
+      : []),
     // Academic Management Section
     {
       title: "Fetched Timetable",
@@ -229,7 +235,7 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
       href: "/dashboard/fetched-timetable",
       routeName: "fetched_timetable",
       isSection: true,
-      sectionTitle: "Academic Management"
+      sectionTitle: "Academic Management",
     },
     {
       title: "Timetable",
@@ -250,37 +256,51 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
       href: "/dashboard/applyleave",
       routeName: "apply_leave",
       isSection: true,
-      sectionTitle: "Leave Management"
+      sectionTitle: "Leave Management",
     },
-    // Approve Leave for Principal
-    ...(userData?.role === "principal" ? [
-      {
-        title: "Approve Leave",
-        icon: <ClipboardList size={20} />,
-        href: "/dashboard/approveleavebyprincipal",
-        routeName: "approve_leave",
-      },
-      {
-        title: "Approve OD Leave",
-        icon: <ClipboardList size={20} />,
-        href: "/dashboard/approveodleave",
-        routeName: "approve_od_leave",
-      },
-    ] : []),
+    // Approve Leave for Principal and HOD
+    ...(userData?.role === "principal"
+      ? [
+          {
+            title: "Approve Leave",
+            icon: <ClipboardList size={20} />,
+            href: "/dashboard/approveleavebyprincipal",
+            routeName: "approve_leave",
+          },
+          {
+            title: "Approve OD Leave",
+            icon: <ClipboardList size={20} />,
+            href: "/dashboard/approveodleave",
+            routeName: "approve_od_leave",
+          },
+        ]
+      : []),
+    ...(userData?.role === "HOD"
+      ? [
+          {
+            title: "Approve Leave",
+            icon: <ClipboardList size={20} />,
+            href: "/dashboard/approveleave",
+            routeName: "approve_leave",
+          },
+        ]
+      : []),
     {
       title: "Apply OD Leave",
       icon: <FileText size={20} />,
       href: "/dashboard/applyodleave",
       routeName: "apply_od_leave",
     },
-    ...(userData?.role === "HOD" ? [
-      {
-        title: "Approve OD Leave",
-        icon: <ClipboardList size={20} />,
-        href: "/dashboard/approveodleave",
-        routeName: "approve_od_leave",
-      },
-    ] : []),
+    ...(userData?.role === "HOD"
+      ? [
+          {
+            title: "Approve OD Leave",
+            icon: <ClipboardList size={20} />,
+            href: "/dashboard/approveodleave",
+            routeName: "approve_od_leave",
+          },
+        ]
+      : []),
     // Handover Management Section
     {
       title: "Apply Charge Handover",
@@ -288,16 +308,18 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
       href: "/dashboard/applyChargeHandover",
       routeName: "apply_charge_handover",
       isSection: true,
-      sectionTitle: "Handover Management"
+      sectionTitle: "Handover Management",
     },
-    ...(userData?.role === "HOD" ? [
-      {
-        title: "Approve Charge Handover",
-        icon: <ClipboardList size={20} />,
-        href: "/dashboard/approveChargeHandover",
-        routeName: "approve_charge_handover",
-      },
-    ] : []),
+    ...(userData?.role === "HOD"
+      ? [
+          {
+            title: "Approve Charge Handover",
+            icon: <ClipboardList size={20} />,
+            href: "/dashboard/approveChargeHandover",
+            routeName: "approve_charge_handover",
+          },
+        ]
+      : []),
     {
       title: "Sent Charge Handover",
       icon: <Clock size={20} />,
@@ -312,11 +334,11 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
       href: "/dashboard/files",
       routeName: "files",
       isSection: true,
-      sectionTitle: "Documents"
+      sectionTitle: "Documents",
     },
 
     // Additional CC functionality for teaching staff with CC assignments
-    ...((isCC && userData?.role === "teaching")
+    ...(isCC && userData?.role === "teaching"
       ? [
           {
             title: "CC Functions",
@@ -324,22 +346,24 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
             href: `/cc-dashboard/${userData._id}`,
             routeName: "cc_dashboard",
             isSection: true,
-            sectionTitle: "Additional Functions"
+            sectionTitle: "Additional Functions",
           },
         ]
       : []),
 
     // CC-specific functionality for users with CC role
-    ...(userData?.role === "cc" ? [
-      {
-        title: "Class Students",
-        icon: <Users size={20} />,
-        href: "/cc-class-students",
-        routeName: "cc_class_students",
-        isSection: true,
-        sectionTitle: "Class Management"
-      },
-    ] : []),
+    ...(userData?.role === "cc"
+      ? [
+          {
+            title: "Class Students",
+            icon: <Users size={20} />,
+            href: "/cc-class-students",
+            routeName: "cc_class_students",
+            isSection: true,
+            sectionTitle: "Class Management",
+          },
+        ]
+      : []),
   ];
 
   const rolePermissions = rolePermissionsAndRoutes.reduce((acc, role) => {
@@ -365,7 +389,7 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
         <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-transparent to-emerald-600/10 pointer-events-none"></div>
         <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/20 to-transparent rounded-full -translate-y-16 translate-x-16 blur-2xl pointer-events-none"></div>
         <div className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-emerald-500/20 to-transparent rounded-full translate-y-20 -translate-x-20 blur-2xl pointer-events-none"></div>
-        
+
         <div className="relative p-6 border-b border-slate-500/30 bg-gradient-to-r from-slate-600/90 to-gray-600/90 backdrop-blur-sm transition-all duration-300">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -386,7 +410,9 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
                     ? "Principal Portal"
                     : userData?.role === "cc"
                     ? "CC Portal"
-                    : ["teaching", "nonteaching", "non-teaching"].includes(userData?.role)
+                    : ["teaching", "nonteaching", "non-teaching"].includes(
+                        userData?.role
+                      )
                     ? "Staff Portal"
                     : "Admin Portal"}
                 </h2>
@@ -397,7 +423,8 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
                 )}
                 {userData?.role === "cc" && (
                   <p className="text-blue-200 text-sm font-medium">
-                    Course Coordinator{userData?.department ? ` - ${userData?.department}` : ''}
+                    Course Coordinator
+                    {userData?.department ? ` - ${userData?.department}` : ""}
                   </p>
                 )}
               </div>
@@ -428,14 +455,18 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
                   }`}
                 >
                   <div className="flex items-center gap-4">
-                    <div className={`p-2.5 rounded-xl transition-all duration-300 ${
-                      location.pathname === item.href
-                        ? "bg-gradient-to-br from-blue-500/50 to-emerald-500/50 text-white shadow-md shadow-blue-400/30"
-                        : "bg-gradient-to-br from-slate-500/50 to-gray-500/50 text-white group-hover:from-blue-500/50 group-hover:to-emerald-500/50 group-hover:shadow-md group-hover:shadow-blue-400/20"
-                    }`}>
+                    <div
+                      className={`p-2.5 rounded-xl transition-all duration-300 ${
+                        location.pathname === item.href
+                          ? "bg-gradient-to-br from-blue-500/50 to-emerald-500/50 text-white shadow-md shadow-blue-400/30"
+                          : "bg-gradient-to-br from-slate-500/50 to-gray-500/50 text-white group-hover:from-blue-500/50 group-hover:to-emerald-500/50 group-hover:shadow-md group-hover:shadow-blue-400/20"
+                      }`}
+                    >
                       {item.icon}
                     </div>
-                    <span className="font-medium text-base text-gray-100">{item.title}</span>
+                    <span className="font-medium text-base text-gray-100">
+                      {item.title}
+                    </span>
                   </div>
                   <ChevronRight
                     size={18}
@@ -453,7 +484,9 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
               <div className="p-2.5 rounded-xl bg-gradient-to-br from-red-500/40 to-pink-500/40 text-white group-hover:from-red-500/60 group-hover:to-pink-500/60 transition-all duration-300 shadow-md shadow-red-400/30">
                 <LogOut size={20} />
               </div>
-              <span className="font-medium text-base text-gray-100">Logout</span>
+              <span className="font-medium text-base text-gray-100">
+                Logout
+              </span>
             </button>
           </div>
         </nav>
@@ -464,7 +497,9 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
-                <p className="text-sm font-semibold text-white truncate">{userData?.email}</p>
+                <p className="text-sm font-semibold text-white truncate">
+                  {userData?.email}
+                </p>
                 {userData?.role === "HOD" && (
                   <span className="px-3 py-1 bg-gradient-to-r from-blue-500 to-emerald-500 text-white text-xs font-bold rounded-full shadow-sm">
                     HOD
