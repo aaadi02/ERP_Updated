@@ -394,8 +394,23 @@ const roleLogin = async (req, res) => {
       });
     }
 
-    // Create a simple token (you can use JWT for better security)
-    const token = `faculty_${faculty._id}_${Date.now()}`;
+    // Create a proper JWT token with library management information
+    const jwt = (await import("jsonwebtoken")).default;
+    const tokenPayload = {
+      id: faculty._id,
+      employeeId: faculty.employeeId,
+      type: faculty.type,
+      role: faculty.type, // Use type as role for compatibility
+      designation: faculty.type,
+      department: faculty.department,
+      employmentStatus: faculty.employmentStatus
+    };
+
+    const token = jwt.sign(
+      tokenPayload,
+      process.env.JWT_SECRET,
+      { expiresIn: "24h" }
+    );
 
     return res.status(200).json({
       success: true,
@@ -407,6 +422,7 @@ const roleLogin = async (req, res) => {
         email: faculty.employeeId + "@college.edu", // Generate email for compatibility
         type: faculty.type,
         designation: faculty.type, // Add designation for compatibility
+        role: faculty.type, // Add role for compatibility
         employmentStatus: faculty.employmentStatus,
         employeeId: faculty.employeeId,
         department: faculty.department

@@ -270,6 +270,9 @@ const StudentList = () => {
         params: {
           page: 1,
           limit: 100
+        },
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
         }
       });
 
