@@ -42,9 +42,32 @@ router.get("/department-faculty-subjects/:departmentName", async (req, res) => {
       departmentName
     );
 
-    // Get faculty records from our new collection
+    // First, find the department by name
+    const AcademicDepartment = (await import("../models/AcademicDepartment.js"))
+      .default;
+    const department = await AcademicDepartment.findOne({
+      name: { $regex: new RegExp(departmentName, "i") }, // Case-insensitive match
+    });
+
+    if (!department) {
+      console.log("[TIMETABLE] Department not found:", departmentName);
+      return res.status(404).json({
+        success: false,
+        message: `Department not found: ${departmentName}`,
+        data: { subjectFacultyMap: {}, totalSubjects: 0, totalAssignments: 0 },
+      });
+    }
+
+    console.log(
+      "[TIMETABLE] Found department:",
+      department.name,
+      "ID:",
+      department._id
+    );
+
+    // Get faculty records from our new collection using department ObjectId
     const records = await FacultyDepartmentSubject.find({
-      department: { $regex: new RegExp(departmentName, "i") }, // Case-insensitive match
+      department: department._id, // Use the ObjectId
       isActive: true,
     })
       .populate("faculty", "firstName lastName email")

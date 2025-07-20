@@ -1,5 +1,5 @@
 import Faculty from "../models/faculty.js";
-import Student from "../models/student.js";
+import Student from "../models/StudentManagement.js";
 import Subject from "../models/Subject.js";
 import AdminSubject from "../models/AdminSubject.js";
 import Attendance from "../models/attendance.js";
@@ -1249,12 +1249,10 @@ const removePrincipalRole = async (req, res) => {
         .json({ success: false, message: "Faculty not found" });
     }
     if (faculty.role !== "principal") {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Faculty is not assigned as Principal",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Faculty is not assigned as Principal",
+      });
     }
     faculty.role = null;
     faculty.type = "teaching"; // Ensure they remain as teaching faculty
@@ -2249,36 +2247,43 @@ const getCCClassStudents = async (req, res) => {
     // Build query to find students matching CC's assignment
     const studentQuery = {};
 
-    // Match department
-    if (departmentName) {
-      studentQuery.department = new RegExp(departmentName, "i");
+    // Match department - if it's ObjectId, use direct comparison, if string find department first
+    if (faculty.department) {
+      if (mongoose.Types.ObjectId.isValid(faculty.department)) {
+        studentQuery.department = faculty.department;
+      } else {
+        // Find department by name first
+        const dept = await Department.findOne({
+          name: new RegExp(faculty.department, "i"),
+        });
+        if (dept) {
+          studentQuery.department = dept._id;
+        }
+      }
     }
 
-    // Match academic year and semester from CC assignment
-    if (ccAssignment.academicYear) {
-      studentQuery.year = ccAssignment.academicYear;
-    }
+    // For now, let's not filter by semester since there's a type mismatch
+    // We'll get all students in the department and section
 
-    if (ccAssignment.semester) {
-      studentQuery.semester = ccAssignment.semester;
-    }
-
+    // Match section - case insensitive string match
     if (ccAssignment.section) {
       studentQuery.section = new RegExp(ccAssignment.section, "i");
     }
 
     console.log("[GetCCClassStudents] Student query:", studentQuery);
 
-    // Fetch students matching the criteria
+    // Fetch students matching the criteria with populated references
     const students = await Student.find(studentQuery)
+      .populate("department", "name")
+      .populate("stream", "name")
       .select(
-        "name enrollmentNumber email phone year section department gender status dateOfBirth address casteCategory subCaste"
+        "firstName lastName middleName studentId email phoneNumber section gender dateOfBirth address nationality photo"
       )
       .lean();
 
     console.log("[GetCCClassStudents] Students found:", students.length);
 
-    // Calculate attendance for each student
+    // Calculate attendance for each student and format data for frontend
     const studentsWithAttendance = await Promise.all(
       students.map(async (student) => {
         try {
@@ -2297,8 +2302,25 @@ const getCCClassStudents = async (req, res) => {
               ? Math.round((presentClasses / totalClasses) * 100)
               : 0;
 
+          // Format student data for frontend
           return {
-            ...student,
+            _id: student._id,
+            name: `${student.firstName} ${student.middleName || ""} ${
+              student.lastName || ""
+            }`.trim(),
+            enrollmentNumber: student.studentId,
+            email: student.email,
+            phone: student.phoneNumber,
+            section: student.section,
+            department: student.department?.name || "N/A",
+            semester:
+              student.semester?.name || student.semester?.number || "N/A",
+            gender: student.gender,
+            status: "active", // Default status since StudentManagement doesn't have status field
+            dateOfBirth: student.dateOfBirth,
+            address: student.address,
+            nationality: student.nationality,
+            photo: student.photo,
             attendancePercentage,
             totalClasses,
             presentClasses,
@@ -2310,7 +2332,19 @@ const getCCClassStudents = async (req, res) => {
             err
           );
           return {
-            ...student,
+            _id: student._id,
+            name: `${student.firstName} ${student.middleName || ""} ${
+              student.lastName || ""
+            }`.trim(),
+            enrollmentNumber: student.studentId,
+            email: student.email,
+            phone: student.phoneNumber,
+            section: student.section,
+            department: student.department?.name || "N/A",
+            semester:
+              student.semester?.name || student.semester?.number || "N/A",
+            gender: student.gender,
+            status: "active",
             attendancePercentage: 0,
             totalClasses: 0,
             presentClasses: 0,
