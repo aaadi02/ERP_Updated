@@ -6,9 +6,19 @@ const UserSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: {
     type: String,
-    enum: ["director", "principal", "HOD", "teaching", "nonteaching", "cc","super_admin"],
+    enum: [
+      "director",
+      "principal",
+      "HOD",
+      "teaching",
+      "nonteaching",
+      "non-teaching",
+      "cc",
+      "facultymanagement",
+      "super_admin",
+    ],
     required: true,
-    Default: "super_admin"
+    Default: "super_admin",
   },
   firstName: { type: String, default: "" },
   lastName: { type: String, default: "" },
@@ -22,10 +32,10 @@ const UserSchema = new mongoose.Schema({
   department: { type: String, default: "" },
   designation: { type: String, default: "" },
   dateOfJoining: { type: String, default: "" },
- employmentStatus: { 
-    type: String, 
+  employmentStatus: {
+    type: String,
     enum: ["Probation Period", "Permanent Employee"],
-    default: "Probation Period" 
+    default: "Probation Period",
   },
   status: { type: String, default: "Active" },
   teachingExperience: { type: Number, default: 0 },
