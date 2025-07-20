@@ -121,18 +121,30 @@ const DocumentManagementDashboard = () => {
     role: "Document Section",
   });
   const [authError, setAuthError] = useState(null);
-  const [token, setToken] = useState("demo-token-12345");
+  const [token, setToken] = useState(localStorage.getItem('token'));
   const [certificatePreview, setCertificatePreview] = useState(null);
 
+  // Authentication helper function
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+  };
+
   useEffect(() => {
-    if (!token) {
+    const storedToken = localStorage.getItem('token');
+    if (!storedToken) {
       setAuthError("No authentication token found");
+      navigate('/');
       return;
     }
+    setToken(storedToken);
     setTimeout(() => {
       setUser({ username: "Faculty User", role: "Document Section" });
     }, 1000);
-  }, [token]);
+  }, [navigate]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -188,9 +200,9 @@ const DocumentManagementDashboard = () => {
       
       console.log('🔍 Searching with params:', params);
       
-      const res = await axios.get("http://localhost:5000/api/students", {
+      const res = await axios.get("http://localhost:5000/api/superadmin/students", {
         params,
-        headers: { Authorization: `Bearer ${token}` },
+        headers: getAuthHeaders(),
       });
       
       if (res.data && res.data.length > 0) {
@@ -203,6 +215,11 @@ const DocumentManagementDashboard = () => {
       }
     } catch (err) {
       setStudentData(null);
+      if (err.response?.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/');
+        return;
+      }
       if (err.response) {
         setErrors({
           api: err.response.data.error || "Failed to fetch student data",
@@ -237,9 +254,9 @@ const DocumentManagementDashboard = () => {
     }
     try {
       const studentRes = await axios.get(
-        `http://localhost:5000/api/students/${studentData._id}`,
+        `http://localhost:5000/api/superadmin/students/${studentData._id}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: getAuthHeaders(),
         }
       );
       const student = studentRes.data;
@@ -266,6 +283,11 @@ const DocumentManagementDashboard = () => {
       };
       setCertificatePreview(certificateData);
     } catch (err) {
+      if (err.response?.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/');
+        return;
+      }
       setErrors({
         api: `Failed to generate preview: ${
           err.response?.data?.error || err.message
@@ -311,17 +333,22 @@ const DocumentManagementDashboard = () => {
       // First try to register the certificate with the backend
       try {
         await axios.post(
-          `http://localhost:5000/api/students/generate-certificate/${studentData._id}`,
+          `http://localhost:5000/api/superadmin/students/generate-certificate/${studentData._id}`,
           {
             type: "BC",
             data: certificateData,
           },
           {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: getAuthHeaders(),
           }
         );
         console.log('✅ Certificate registered with backend successfully');
       } catch (apiErr) {
+        if (apiErr.response?.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/');
+          return;
+        }
         console.warn('⚠️ Backend certificate registration failed:', apiErr.response?.data?.error || apiErr.message);
         // Continue with PDF generation even if backend fails
       }
@@ -473,6 +500,7 @@ const DocumentManagementDashboard = () => {
     const confirmLogout = window.confirm("Are you sure you want to logout?");
     if (!confirmLogout) return;
   
+    localStorage.removeItem('token');
     setToken(null);
     setUser(null);
     setFirstName("");

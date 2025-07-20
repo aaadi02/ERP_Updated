@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Download as DownloadIcon, Sun, Moon } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
@@ -44,6 +45,7 @@ const themeClasses = {
 };
 
 const Download = () => {
+  const navigate = useNavigate();
   const [theme, setTheme] = useState("light");
   const currentTheme = themeClasses[theme];
   const [students, setStudents] = useState([]);
@@ -58,12 +60,25 @@ const Download = () => {
   const [departments, setDepartments] = useState([]);
   const [places, setPlaces] = useState([]);
 
+  // Authentication helper function
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+  };
+
   const fetchWithRetry = async (url, options, retries = 3, delay = 1000) => {
     for (let i = 0; i < retries; i++) {
       try {
         const response = await axios(url, options);
         return response;
       } catch (err) {
+        // Don't retry on authentication errors
+        if (err.response?.status === 401) {
+          throw err;
+        }
         if (i === retries - 1) throw err;
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
@@ -73,8 +88,8 @@ const Download = () => {
   const fetchStudents = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetchWithRetry("http://localhost:5000/api/students", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("facultyToken")}` },
+      const res = await fetchWithRetry("http://localhost:5000/api/superadmin/students", {
+        headers: getAuthHeaders(),
       });
       const data = res.data;
       setStudents(data);
@@ -87,6 +102,11 @@ const Download = () => {
       setPlaces(uniquePlaces);
       setFetchError(null);
     } catch (err) {
+      if (err.response?.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/');
+        return;
+      }
       setFetchError(err.response?.data?.error || "Failed to fetch students. Please check your connection.");
     } finally {
       setLoading(false);

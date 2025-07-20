@@ -3,10 +3,21 @@
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { Sun, Moon } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const RemarkSection = () => {
+  const navigate = useNavigate();
   const [theme, setTheme] = useState("light");
   const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
+
+  // Authentication helper function
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    };
+  };
 
   // Theme classes based on AdmissionForm
   const themeClasses = {
@@ -66,6 +77,10 @@ const RemarkSection = () => {
         const response = await axios(url, options);
         return response;
       } catch (err) {
+        if (err.response?.status === 401) {
+          // Don't retry on authentication errors
+          throw err;
+        }
         if (i === retries - 1) throw err;
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
@@ -75,11 +90,11 @@ const RemarkSection = () => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const studentRes = await fetchWithRetry("http://localhost:5000/api/students", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("facultyToken")}` },
+      const studentRes = await fetchWithRetry("http://localhost:5000/api/superadmin/students", {
+        headers: getAuthHeaders(),
       });
       const scholarshipRes = await fetchWithRetry("http://localhost:5000/api/scholarships", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("facultyToken")}` },
+        headers: getAuthHeaders(),
       });
       console.log("Fetched scholarships:", scholarshipRes.data); // Debug log
       setStudents(studentRes.data);
@@ -90,11 +105,16 @@ const RemarkSection = () => {
       setStreams(uniqueStreams);
       setFetchError(null);
     } catch (err) {
+      if (err.response?.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/');
+        return;
+      }
       setFetchError(err.response?.data?.error || "Failed to fetch data. Please check your connection.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     fetchData();
