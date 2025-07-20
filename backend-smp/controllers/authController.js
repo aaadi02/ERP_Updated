@@ -88,45 +88,69 @@ const registerUser = async (req, res) => {
 const login = async (req, res) => {
   // Accept either employeeId or email
   const { employeeId, email, password } = req.body;
-  console.log("Login attempt:", { employeeId, email, password: password ? "***provided***" : "***missing***" });
-  
+  console.log("Login attempt:", {
+    employeeId,
+    email,
+    password: password ? "***provided***" : "***missing***",
+  });
+
   try {
     let user = null;
-    let userType = 'user';
-    
+    let userType = "user";
+
     // First try to find in User model
     user = await User.findOne(employeeId ? { employeeId } : { email });
-    console.log("User model search:", employeeId ? `employeeId: ${employeeId}` : `email: ${email}`, "found:", !!user);
-    
+    console.log(
+      "User model search:",
+      employeeId ? `employeeId: ${employeeId}` : `email: ${email}`,
+      "found:",
+      !!user
+    );
+
     // If not found in User model, try Faculty model
     if (!user) {
       user = await Faculty.findOne(employeeId ? { employeeId } : { email });
-      userType = 'faculty';
-      console.log("Faculty model search:", employeeId ? `employeeId: ${employeeId}` : `email: ${email}`, "found:", !!user);
+      userType = "faculty";
+      console.log(
+        "Faculty model search:",
+        employeeId ? `employeeId: ${employeeId}` : `email: ${email}`,
+        "found:",
+        !!user
+      );
     }
-    
+
     // If not found in Faculty model, try Driver model
     if (!user) {
       // For Driver model, search by employeeId or email in personalInfo
-      const searchQuery = employeeId 
-        ? { 'employment.employeeId': employeeId }
-        : { 'personalInfo.email': email };
-      user = await Driver.findOne(searchQuery).select('+password');
-      userType = 'driver';
-      console.log("Driver model search:", employeeId ? `employeeId: ${employeeId}` : `email: ${email}`, "found:", !!user);
+      const searchQuery = employeeId
+        ? { "employment.employeeId": employeeId }
+        : { "personalInfo.email": email };
+      user = await Driver.findOne(searchQuery).select("+password");
+      userType = "driver";
+      console.log(
+        "Driver model search:",
+        employeeId ? `employeeId: ${employeeId}` : `email: ${email}`,
+        "found:",
+        !!user
+      );
     }
-    
+
     // If not found in Driver model, try Conductor model
     if (!user) {
       // For Conductor model, search by employeeId or email in personalInfo
-      const searchQuery = employeeId 
-        ? { 'employment.employeeId': employeeId }
-        : { 'personalInfo.email': email };
-      user = await Conductor.findOne(searchQuery).select('+password');
-      userType = 'conductor';
-      console.log("Conductor model search:", employeeId ? `employeeId: ${employeeId}` : `email: ${email}`, "found:", !!user);
+      const searchQuery = employeeId
+        ? { "employment.employeeId": employeeId }
+        : { "personalInfo.email": email };
+      user = await Conductor.findOne(searchQuery).select("+password");
+      userType = "conductor";
+      console.log(
+        "Conductor model search:",
+        employeeId ? `employeeId: ${employeeId}` : `email: ${email}`,
+        "found:",
+        !!user
+      );
     }
-    
+
     console.log("User found:", user ? `${userType} model` : "not found");
 
     if (!user) {
@@ -142,7 +166,7 @@ const login = async (req, res) => {
     console.log("Comparing passwords...");
     const isMatch = await bcrypt.compare(password, user.password);
     console.log("Password match result:", isMatch);
-    
+
     if (!isMatch) {
       console.log("Password mismatch, returning invalid credentials");
       return res.status(400).json({ message: "Invalid credentials" });
@@ -155,32 +179,65 @@ const login = async (req, res) => {
     };
 
     // Set role and other fields based on which model the user came from
-    if (userType === 'faculty') {
+    if (userType === "faculty") {
       tokenPayload.employeeId = user.employeeId;
-      tokenPayload.role = user.role;
+
+      // Properly map faculty role based on role and type fields
+      let facultyRole = "teaching"; // default
+
+      // First check for special roles (highest priority)
+      if (user.role === "principal") {
+        facultyRole = "principal";
+      } else if (user.role === "hod") {
+        facultyRole = "HOD";
+      }
+      // Check for CC assignment (active CC assignments)
+      else if (user.ccAssignments && user.ccAssignments.length > 0) {
+        // If user has active CC assignments, set role as cc
+        facultyRole = "cc";
+      }
+      // Check for faculty management role (could be based on designation or special permission)
+      else if (
+        user.designation &&
+        (user.designation.toLowerCase().includes("management") ||
+          user.designation.toLowerCase().includes("admin") ||
+          user.designation.toLowerCase().includes("coordinator"))
+      ) {
+        facultyRole = "facultymanagement";
+      }
+      // Check type field for other roles
+      else if (user.type === "cc") {
+        facultyRole = "cc";
+      } else if (user.type === "non-teaching") {
+        facultyRole = "non-teaching";
+      } else if (user.type === "teaching") {
+        facultyRole = "teaching";
+      } else if (user.type === "HOD") {
+        facultyRole = "HOD";
+      } else if (user.type === "principal") {
+        facultyRole = "principal";
+      }
+
+      tokenPayload.role = facultyRole;
       tokenPayload.type = user.type;
-    } else if (userType === 'driver') {
+    } else if (userType === "driver") {
       tokenPayload.employeeId = user.employment?.employeeId;
-      tokenPayload.role = 'driver';
-      tokenPayload.type = 'driver';
+      tokenPayload.role = "driver";
+      tokenPayload.type = "driver";
       tokenPayload.email = user.personalInfo?.email;
-    } else if (userType === 'conductor') {
+    } else if (userType === "conductor") {
       tokenPayload.employeeId = user.employment?.employeeId;
-      tokenPayload.role = 'conductor';
-      tokenPayload.type = 'conductor';
+      tokenPayload.role = "conductor";
+      tokenPayload.type = "conductor";
     } else {
       tokenPayload.employeeId = user.employeeId;
       tokenPayload.role = user.role;
       tokenPayload.type = user.type;
     }
 
-    const token = jwt.sign(
-      tokenPayload,
-      process.env.JWT_SECRET,
-      {
-        expiresIn: "1h",
-      }
-    );
+    const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
 
     // Prepare user response based on user type
     let userResponse = {
@@ -188,7 +245,7 @@ const login = async (req, res) => {
       role: tokenPayload.role,
     };
 
-    if (userType === 'driver') {
+    if (userType === "driver") {
       userResponse = {
         ...userResponse,
         firstName: user.personalInfo?.firstName,
@@ -199,7 +256,7 @@ const login = async (req, res) => {
         dateOfJoining: user.employment?.dateOfJoining,
         status: user.employment?.status || user.status,
       };
-    } else if (userType === 'conductor') {
+    } else if (userType === "conductor") {
       userResponse = {
         ...userResponse,
         firstName: user.personalInfo?.firstName,
@@ -241,7 +298,7 @@ const login = async (req, res) => {
 
     res.json({
       token,
-      user: userResponse
+      user: userResponse,
     });
   } catch (error) {
     console.error("Login Error:", error);
@@ -254,20 +311,20 @@ const getUserProfile = async (req, res) => {
     console.log("=== getUserProfile Debug Start ===");
     console.log("User ID from token:", req.user.userId);
     console.log("Employee ID from token:", req.user.employeeId);
-    
+
     // First try to find user in User model
     let user = await User.findById(req.user.userId).select("-password");
     let isFaculty = false;
-    
+
     console.log("User found in User model:", !!user);
-    
+
     // If not found in User model, try Faculty model
     if (!user) {
       user = await Faculty.findById(req.user.userId).select("-password");
       isFaculty = true;
       console.log("User found in Faculty model:", !!user);
     }
-    
+
     if (!user) {
       console.log("No user found in either model");
       return res.status(404).json({ message: "User not found" });
@@ -279,51 +336,57 @@ const getUserProfile = async (req, res) => {
       firstName: user.firstName,
       lastName: user.lastName,
       isFaculty: isFaculty,
-      subjectsTaughtCount: user.subjectsTaught?.length || 0
+      subjectsTaughtCount: user.subjectsTaught?.length || 0,
     });
 
     // Always try to fetch subjects from Faculty collection using employeeId
     let subjects = [];
-    
+
     try {
       let facultyData = null;
-      
+
       if (isFaculty) {
         // If user is from Faculty model, populate subjects directly
         console.log("Fetching subjects for faculty user...");
-        facultyData = await Faculty.findById(user._id)
-          .populate({
-            path: 'subjectsTaught',
-            model: 'AdminSubject',
-            select: 'name department'
-          });
+        facultyData = await Faculty.findById(user._id).populate({
+          path: "subjectsTaught",
+          model: "AdminSubject",
+          select: "name department",
+        });
       } else if (user.employeeId) {
         // If user is from User model, find faculty by employeeId
         console.log("Finding faculty by employeeId:", user.employeeId);
-        facultyData = await Faculty.findOne({ employeeId: user.employeeId })
-          .populate({
-            path: 'subjectsTaught',
-            model: 'AdminSubject',
-            select: 'name department'
-          });
+        facultyData = await Faculty.findOne({
+          employeeId: user.employeeId,
+        }).populate({
+          path: "subjectsTaught",
+          model: "AdminSubject",
+          select: "name department",
+        });
       }
-      
+
       console.log("Faculty data found:", !!facultyData);
-      
+
       if (facultyData) {
         console.log("Faculty subjectsTaught array:", {
           exists: !!facultyData.subjectsTaught,
           length: facultyData.subjectsTaught?.length || 0,
-          isArray: Array.isArray(facultyData.subjectsTaught)
+          isArray: Array.isArray(facultyData.subjectsTaught),
         });
-        
-        if (facultyData.subjectsTaught && facultyData.subjectsTaught.length > 0) {
+
+        if (
+          facultyData.subjectsTaught &&
+          facultyData.subjectsTaught.length > 0
+        ) {
           subjects = facultyData.subjectsTaught;
-          console.log("Subjects populated:", subjects.map(s => ({
-            id: s._id,
-            name: s.name,
-            department: s.department
-          })));
+          console.log(
+            "Subjects populated:",
+            subjects.map((s) => ({
+              id: s._id,
+              name: s.name,
+              department: s.department,
+            }))
+          );
         } else {
           console.log("No subjects found in faculty data");
         }
@@ -338,12 +401,15 @@ const getUserProfile = async (req, res) => {
     // Return user data with subjects
     const userWithSubjects = {
       ...user.toObject(),
-      subjectsTaught: subjects
+      subjectsTaught: subjects,
     };
 
     console.log("=== Final Response ===");
     console.log("Subjects being returned:", subjects.length);
-    console.log("Subject names:", subjects.map(s => s.name));
+    console.log(
+      "Subject names:",
+      subjects.map((s) => s.name)
+    );
     console.log("=== getUserProfile Debug End ===");
 
     res.json(userWithSubjects);
@@ -444,9 +510,4 @@ const updateUserProfile = async (req, res) => {
   }
 };
 
-export {
-  registerUser,
-  login,
-  getUserProfile,
-  updateUserProfile,
-};
+export { registerUser, login, getUserProfile, updateUserProfile };

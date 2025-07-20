@@ -98,12 +98,12 @@ const App = () => {
         <>
           {/* Mobile Overlay */}
           {isSidebarOpen && (
-            <div 
+            <div
               className="lg:hidden fixed inset-0 bg-black/50 z-40 transition-opacity duration-300"
               onClick={() => setIsSidebarOpen(false)}
             />
           )}
-          
+
           {userData.role === "facultymanagement" ? (
             <FacultySidebar
               isOpen={isSidebarOpen}
