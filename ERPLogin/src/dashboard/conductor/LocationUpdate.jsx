@@ -40,6 +40,7 @@ const LocationUpdate = () => {
       try {
         setLoadingStudents(true);
         const allStudents = await getAllStudents();
+        console.log('Fetched all students:', allStudents);
         const studentsOnRoute = allStudents.filter(student => 
           student.busService && student.routes === route?.name
         );
