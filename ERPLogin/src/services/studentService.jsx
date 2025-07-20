@@ -3,7 +3,9 @@ const API = axios.create({ baseURL: 'http://localhost:5000/api' });
 
 export const getAllStudents = async () => {
   try {
-    const response = await API.get('/superadmin/students');
+    const response = await API.get('/superadmin/students',{headers:{
+      "Authorization": `Bearer ${localStorage.getItem('token')}`
+    }});
     return response.data;
   } catch (error) {
     console.error('Error fetching students:', error);

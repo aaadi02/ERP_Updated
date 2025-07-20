@@ -23,12 +23,13 @@ const Dashboard = () => {
 
         // Get all buses
         const response = await getAllBuses();
-        if (!response.data || !response.data.buses) {
+        console.log('Fetched buses:', response);
+        if (!response.data || !response.data?.data?.buses) {
           throw new Error('Invalid response format');
         }
 
         // Find the bus assigned to this conductor
-        const assignedBus = response.data.buses.find(b => 
+        const assignedBus = response.data?.data?.buses.find(b => 
           b.conductor && b.conductor._id === user._id
         );
 

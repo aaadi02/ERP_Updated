@@ -47,9 +47,15 @@ const RoleLogin = () => {
         return;
       }
 
-      login(localStorage.setItem("token", res.data.token));
-      localStorage.setItem("faculty", JSON.stringify(faculty));
-      navigate(redirectPath);
+      // Call login function properly with token and faculty data
+      login(res.data.token, faculty);
+      
+      // Only navigate if login was successful (library access granted)
+      // The login function will handle authentication and show error if needed
+      if (faculty.type === 'Library Management' || 
+          (faculty.type && faculty.type.toLowerCase().includes('library'))) {
+        navigate(redirectPath);
+      }
     } catch (err) {
       setError(err.response?.data?.error || "An error occurred during login.");
     } finally {

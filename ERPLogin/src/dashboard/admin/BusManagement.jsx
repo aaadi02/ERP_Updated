@@ -37,10 +37,12 @@ const BusManagement = () => {
       ]);
       
       // Handle different response structures
-      const busesData = busesResponse.data?.buses || busesResponse.data?.data || busesResponse.data || [];
+      const busesData = busesResponse.data?.buses || busesResponse.data?.data?.buses || busesResponse.data || [];
       const routesData = routesResponse.data?.routes || routesResponse.data?.data || routesResponse.data || [];
       const driversData = driversResponse.data?.drivers || driversResponse.data?.data || driversResponse.data || [];
-      
+      console.log('Fetched buses:', busesData);
+      console.log('Fetched routes:', routesData);
+      console.log('Fetched drivers:', driversData);
       setBuses(busesData);
 
       // Filter out routes that are already assigned to buses

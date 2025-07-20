@@ -16,7 +16,9 @@ const BusMonitoring = () => {
         const response = await getAllBuses();
         // Ensure we're setting an array of buses
         const busesData = Array.isArray(response) ? response : 
-                         response.data ? response.data.buses || [] : [];
+                         response.data ? response.data?.data?.buses || [] : [];
+
+        console.log('Fetched buses:', response);
         setBuses(busesData);
       } catch (err) {
         setError('Failed to fetch bus data');
