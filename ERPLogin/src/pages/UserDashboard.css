@@ -1,0 +1,45 @@
+.user-dashboard {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  
+  .dashboard-content {
+    flex: 1;
+    padding: 2rem;
+  }
+  
+  .view-tabs {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 1rem;
+  }
+  
+  .view-tabs button {
+    padding: 0.5rem 1rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    color: #666;
+    border-bottom: 2px solid transparent;
+  }
+  
+  .view-tabs button:hover {
+    color: #333;
+  }
+  
+  .view-tabs button.active {
+    color: #4CAF50;
+    border-bottom: 2px solid #4CAF50;
+    font-weight: 500;
+  }
+  
+  .content-area {
+    background-color: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }

@@ -42,6 +42,15 @@ router.post("/login", async (req, res) => {
       });
     }
 
+    // Check if student login is enabled
+    if (student.loginEnabled === false) {
+      console.log(`[STUDENT LOGIN] Login disabled for student: ${studentId}`);
+      return res.status(403).json({
+        success: false,
+        message: "Your account access has been disabled. Please contact administration."
+      });
+    }
+
     // Check if student has a custom password set
     if (student.customPassword) {
       console.log(`[STUDENT LOGIN] Using custom password for student: ${studentId}`);

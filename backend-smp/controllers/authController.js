@@ -1,5 +1,7 @@
 import User from "../models/User.js";
 import Faculty from "../models/faculty.js";
+import Driver from "../models/Driver.js";
+import Conductor from "../models/Conductor.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import AdminSubject from "../models/AdminSubject.js";
@@ -103,6 +105,28 @@ const login = async (req, res) => {
       console.log("Faculty model search:", employeeId ? `employeeId: ${employeeId}` : `email: ${email}`, "found:", !!user);
     }
     
+    // If not found in Faculty model, try Driver model
+    if (!user) {
+      // For Driver model, search by employeeId or email in personalInfo
+      const searchQuery = employeeId 
+        ? { 'employment.employeeId': employeeId }
+        : { 'personalInfo.email': email };
+      user = await Driver.findOne(searchQuery).select('+password');
+      userType = 'driver';
+      console.log("Driver model search:", employeeId ? `employeeId: ${employeeId}` : `email: ${email}`, "found:", !!user);
+    }
+    
+    // If not found in Driver model, try Conductor model
+    if (!user) {
+      // For Conductor model, search by employeeId or email in personalInfo
+      const searchQuery = employeeId 
+        ? { 'employment.employeeId': employeeId }
+        : { 'personalInfo.email': email };
+      user = await Conductor.findOne(searchQuery).select('+password');
+      userType = 'conductor';
+      console.log("Conductor model search:", employeeId ? `employeeId: ${employeeId}` : `email: ${email}`, "found:", !!user);
+    }
+    
     console.log("User found:", user ? `${userType} model` : "not found");
 
     if (!user) {
@@ -127,16 +151,26 @@ const login = async (req, res) => {
     // Create token with appropriate role based on user type
     const tokenPayload = {
       id: user._id,
-      userId: user._id, 
-      employeeId: user.employeeId,
+      userId: user._id,
     };
 
-    // Set role based on which model the user came from
+    // Set role and other fields based on which model the user came from
     if (userType === 'faculty') {
-      tokenPayload.role = user.role; // Use role from Faculty model
+      tokenPayload.employeeId = user.employeeId;
+      tokenPayload.role = user.role;
       tokenPayload.type = user.type;
+    } else if (userType === 'driver') {
+      tokenPayload.employeeId = user.employment?.employeeId;
+      tokenPayload.role = 'driver';
+      tokenPayload.type = 'driver';
+      tokenPayload.email = user.personalInfo?.email;
+    } else if (userType === 'conductor') {
+      tokenPayload.employeeId = user.employment?.employeeId;
+      tokenPayload.role = 'conductor';
+      tokenPayload.type = 'conductor';
     } else {
-      tokenPayload.role = user.role; // Use role from User model  
+      tokenPayload.employeeId = user.employeeId;
+      tokenPayload.role = user.role;
       tokenPayload.type = user.type;
     }
 
@@ -148,13 +182,40 @@ const login = async (req, res) => {
       }
     );
 
-    res.json({
-      token,
-      user: {
-        _id: user._id,
+    // Prepare user response based on user type
+    let userResponse = {
+      _id: user._id,
+      role: tokenPayload.role,
+    };
+
+    if (userType === 'driver') {
+      userResponse = {
+        ...userResponse,
+        firstName: user.personalInfo?.firstName,
+        lastName: user.personalInfo?.lastName,
+        email: user.personalInfo?.email,
+        employeeId: user.employment?.employeeId,
+        contactNumber: user.personalInfo?.contactNumber,
+        dateOfJoining: user.employment?.dateOfJoining,
+        status: user.employment?.status || user.status,
+      };
+    } else if (userType === 'conductor') {
+      userResponse = {
+        ...userResponse,
+        firstName: user.personalInfo?.firstName,
+        lastName: user.personalInfo?.lastName,
+        email: user.personalInfo?.email,
+        employeeId: user.employment?.employeeId,
+        contactNumber: user.personalInfo?.contactNumber,
+        dateOfJoining: user.employment?.dateOfJoining,
+        status: user.employment?.status || user.status,
+      };
+    } else {
+      // Faculty or User model
+      userResponse = {
+        ...userResponse,
         username: user.username,
         email: user.email,
-        role: user.type,
         firstName: user.firstName,
         lastName: user.lastName,
         name: user.name,
@@ -175,7 +236,12 @@ const login = async (req, res) => {
         researchPublications: user.researchPublications,
         technicalSkills: user.technicalSkills,
         workExperience: user.workExperience,
-      },
+      };
+    }
+
+    res.json({
+      token,
+      user: userResponse
     });
   } catch (error) {
     console.error("Login Error:", error);

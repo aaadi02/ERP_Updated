@@ -1,0 +1,60 @@
+.route-timeline {
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.timeline-item {
+  position: relative;
+  padding-left: 30px;
+  margin-bottom: 20px;
+}
+
+.timeline-dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #e0e0e0;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 2px #e0e0e0;
+}
+
+.timeline-dot.covered {
+  background: #4CAF50;
+  box-shadow: 0 0 0 2px #4CAF50;
+}
+
+.timeline-line {
+  position: absolute;
+  left: 7px;
+  top: 16px;
+  width: 2px;
+  height: calc(100% + 4px);
+  background: #e0e0e0;
+}
+
+.timeline-line.covered {
+  background: #4CAF50;
+}
+
+.timeline-content {
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.timeline-content h4 {
+  margin: 0;
+  color: #333;
+  font-size: 14px;
+}
+
+.timeline-content p {
+  margin: 5px 0 0;
+  color: #666;
+  font-size: 12px;
+} 

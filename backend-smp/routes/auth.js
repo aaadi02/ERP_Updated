@@ -5,6 +5,7 @@ import {
   getUserProfile,
   updateUserProfile,
 } from "../controllers/authController.js";
+import { studentLogin } from "../controllers/studentAuthController.js";
 import jwt from "jsonwebtoken";
 
 const router = express.Router();
@@ -35,6 +36,10 @@ router.post("/register", registerUser);
 router.post("/login", (req, res) => {
   console.log("[AUTH ROUTE] Login route hit");
   login(req, res);
+});
+router.post("/student-login", (req, res) => {
+  console.log("[AUTH ROUTE] Student login route hit");
+  studentLogin(req, res);
 });
 router.get("/profile", authMiddleware, getUserProfile);
 router.put("/profile", authMiddleware, updateUserProfile);

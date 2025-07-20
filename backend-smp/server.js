@@ -59,6 +59,14 @@ import borrowerEntryRoutes from "./routes/borrowerEntryRoutes.js";
 import duesRoutes from "./routes/duesRoutes.js";
 import facultyDepartmentSubjectRoutes from "./routes/facultyDepartmentSubjectRoutes.js";
 
+// Bus Management Routes
+import busRoutes from "./routes/busRoutes.js";
+import driverRoutes from "./routes/driverRoutes.js";
+import conductorRoutes from "./routes/conductorRoutes.js";
+import routeRoutes from "./routes/routeRoutes.js";
+import scheduleRoutes from "./routes/scheduleRoutes.js";
+import problemRoutes from "./routes/problemRoutes.js";
+
 
 // Setup __dirname in ES module
 const __filename = fileURLToPath(import.meta.url);
@@ -196,6 +204,14 @@ app.use("/api/issues", issueRoutes);
 app.use("/api", borrowerEntryRoutes);
 app.use("/api/dues", duesRoutes);
 app.use("/api/faculty-dept-subject", facultyDepartmentSubjectRoutes);
+
+// Bus Management Routes
+app.use("/api/buses", busRoutes);
+app.use("/api/drivers", driverRoutes);
+app.use("/api/conductors", conductorRoutes);
+app.use("/api/routes", routeRoutes);
+app.use("/api/schedules", scheduleRoutes);
+app.use("/api/problems", problemRoutes);
 
 
 // Connect to MongoDB

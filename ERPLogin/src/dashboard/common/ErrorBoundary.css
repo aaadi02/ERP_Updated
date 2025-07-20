@@ -1,0 +1,22 @@
+.error-boundary {
+    padding: 1rem;
+    margin: 1rem 0;
+    border: 1px solid #ff6b6b;
+    border-radius: 4px;
+    background-color: #fff5f5;
+    color: #ff6b6b;
+  }
+  
+  .retry-btn {
+    margin-top: 0.5rem;
+    padding: 0.5rem 1rem;
+    background-color: #ff6b6b;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .retry-btn:hover {
+    background-color: #ff5252;
+  }

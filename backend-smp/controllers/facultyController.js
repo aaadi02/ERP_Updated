@@ -364,6 +364,65 @@ const staffLogin = async (req, res) => {
   }
 };
 
+// Role-based login for AuthFaculty
+const roleLogin = async (req, res) => {
+  try {
+    const { employeeId, password } = req.body;
+    
+    if (!employeeId || !password) {
+      return res.status(400).json({ 
+        error: "Employee ID and password are required" 
+      });
+    }
+
+    // Import AuthFaculty model
+    const AuthFaculty = (await import("../models/AuthFaculty.js")).default;
+    
+    // Find faculty by employee ID
+    const faculty = await AuthFaculty.findOne({ employeeId });
+    if (!faculty) {
+      return res.status(404).json({ 
+        error: "Faculty not found with this Employee ID" 
+      });
+    }
+
+    // Check password (assuming it's stored as plain text in your schema)
+    // If you're using hashed passwords, use bcrypt.compare instead
+    if (faculty.password !== password) {
+      return res.status(401).json({ 
+        error: "Invalid credentials" 
+      });
+    }
+
+    // Create a simple token (you can use JWT for better security)
+    const token = `faculty_${faculty._id}_${Date.now()}`;
+
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      faculty: {
+        _id: faculty._id,
+        firstname: faculty.firstname,
+        name: faculty.firstname, // Add name for compatibility
+        email: faculty.employeeId + "@college.edu", // Generate email for compatibility
+        type: faculty.type,
+        designation: faculty.type, // Add designation for compatibility
+        employmentStatus: faculty.employmentStatus,
+        employeeId: faculty.employeeId,
+        department: faculty.department
+      },
+      token: token
+    });
+
+  } catch (error) {
+    console.error("Role login error:", error);
+    return res.status(500).json({
+      error: "Internal server error",
+      message: error.message
+    });
+  }
+};
+
 const updatePassword = async (req, res) => {
   try {
     const { newPassword, confirmPassword, email } = req.body;
@@ -2357,6 +2416,7 @@ const getCCClassStudents = async (req, res) => {
 export {
   facultyRegister,
   staffLogin,
+  roleLogin,
   updatePassword,
   updateFaculty,
   deleteFaculty,
