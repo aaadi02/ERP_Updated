@@ -14,6 +14,7 @@ const RoleLogin = () => {
     "Student Management": "/dashboard/summary",
     "Account Section Management": "/faculty/account-section",
     "Document Section Management": "/faculty/document-section",
+    "Document Management": "/faculty/document-section", // Added mapping for "Document Management"
     "Scholarship Management": "/faculty/scholarship",
     "Notification System Management": "/faculty/notification-system",
     "Library Management": "/faculty/library",

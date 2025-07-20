@@ -1,49 +1,87 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { PlusCircle, Edit2, Trash2, Save, X, Loader } from "lucide-react";
 
 const StreamManager = () => {
+  const navigate = useNavigate();
   const [streams, setStreams] = useState([]);
   const [newStream, setNewStream] = useState({ name: "", description: "" });
   const [editingStream, setEditingStream] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // Helper function to get auth headers
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      localStorage.removeItem('token');
+      navigate('/');
+      return null;
+    }
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+  };
 
   useEffect(() => {
     const fetchStreams = async () => {
       try {
-        // Keep the original API call logic
+        const headers = getAuthHeaders();
+        if (!headers) return;
+
         const res = await fetch(
-          "http://localhost:5000/api/streams"
+          "/api/superadmin/streams",
+          { headers }
         );
+        
+        if (res.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/');
+          return;
+        }
+        
         const data = await res.json();
         setStreams(data);
         setLoading(false);
+        setError("");
       } catch (err) {
         console.error(err);
+        setError("Failed to fetch streams");
         setLoading(false);
       }
     };
 
     fetchStreams();
-  }, []);
+  }, [navigate]);
 
   const handleCreateStream = async () => {
     try {
-      // Keep the original API call logic
+      const headers = getAuthHeaders();
+      if (!headers) return;
+
       const res = await fetch(
-        "http://localhost:5000/api/streams",
+        "/api/superadmin/streams",
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers,
           body: JSON.stringify(newStream),
         }
       );
+      
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/');
+        return;
+      }
+      
       const data = await res.json();
       setStreams([...streams, data]);
       setNewStream({ name: "", description: "" });
+      setError("");
     } catch (err) {
       console.error(err);
+      setError("Failed to create stream");
     }
   };
 
@@ -53,34 +91,55 @@ const StreamManager = () => {
 
   const handleSaveStream = async () => {
     try {
-      // Keep the original API call logic
+      const headers = getAuthHeaders();
+      if (!headers) return;
+
       const res = await fetch(
-        `http://localhost:5000/api/streams/${editingStream._id}`,
+        `/api/superadmin/streams/${editingStream._id}`,
         {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers,
           body: JSON.stringify(editingStream),
         }
       );
+      
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/');
+        return;
+      }
+      
       const data = await res.json();
       setStreams(streams.map((s) => (s._id === data._id ? data : s)));
       setEditingStream(null);
+      setError("");
     } catch (err) {
       console.error(err);
+      setError("Failed to update stream");
     }
   };
 
   const handleDeleteStream = async (id) => {
     try {
-      // Keep the original API call logic
-      await fetch(`http://localhost:5000/api/streams/${id}`, {
+      const headers = getAuthHeaders();
+      if (!headers) return;
+
+      const res = await fetch(`/api/superadmin/streams/${id}`, {
         method: "DELETE",
+        headers,
       });
+      
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/');
+        return;
+      }
+      
       setStreams(streams.filter((s) => s._id !== id));
+      setError("");
     } catch (err) {
       console.error(err);
+      setError("Failed to delete stream");
     }
   };
 
@@ -89,6 +148,20 @@ const StreamManager = () => {
       <h2 className="text-2xl font-bold text-gray-800 mb-6 border-b pb-3">
         Stream Manager
       </h2>
+
+      {/* Error Message */}
+      {error && (
+        <div className="mb-6 bg-red-50 border-l-4 border-red-400 p-4 rounded-lg">
+          <div className="flex items-center">
+            <div className="text-red-400 mr-3">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <p className="text-red-800 font-medium">{error}</p>
+          </div>
+        </div>
+      )}
 
       {/* Create Stream Section */}
       <div className="mb-8 bg-gray-50 p-5 rounded-lg shadow-sm">

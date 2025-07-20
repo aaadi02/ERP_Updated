@@ -1,10 +1,27 @@
 import express from "express";
+import jwt from "jsonwebtoken";
 import Stream from "../models/Stream.js";
 
 const router = express.Router();
 
+// Middleware to verify token
+const verifyToken = (req, res, next) => {
+  const token = req.header("Authorization")?.split(" ")[1]; // Bearer <token>
+  if (!token) {
+    return res.status(401).json({ message: "Access Denied" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    res.status(400).json({ message: "Invalid Token" });
+  }
+};
+
 // Create Stream
-router.post("/", async (req, res) => {
+router.post("/", verifyToken, async (req, res) => {
   try {
     const { name, description } = req.body;
     const newStream = new Stream({ name, description });
@@ -16,7 +33,7 @@ router.post("/", async (req, res) => {
 });
 
 // Get all Streams
-router.get("/", async (req, res) => {
+router.get("/", verifyToken, async (req, res) => {
   try {
     const streams = await Stream.find();
     res.status(200).json(streams);
@@ -26,7 +43,7 @@ router.get("/", async (req, res) => {
 });
 
 // Update Stream
-router.put("/:id", async (req, res) => {
+router.put("/:id", verifyToken, async (req, res) => {
   try {
     const { name, description } = req.body;
     const stream = await Stream.findByIdAndUpdate(
@@ -41,7 +58,7 @@ router.put("/:id", async (req, res) => {
 });
 
 // Delete Stream
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", verifyToken, async (req, res) => {
   try {
     await Stream.findByIdAndDelete(req.params.id);
     res.status(200).json({ message: "Stream deleted successfully" });

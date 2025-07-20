@@ -355,6 +355,17 @@ function StudentList() {
   });
   const navigate = useNavigate();
 
+  // Helper function to get auth headers
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token'); // Use 'token' instead of 'facultyToken'
+    if (!token) {
+      localStorage.removeItem('token');
+      navigate('/');
+      return null;
+    }
+    return { Authorization: `Bearer ${token}` };
+  };
+
   const fetchWithRetry = async (url, options, retries = 3, delay = 1000) => {
     for (let i = 0; i < retries; i++) {
       try {
@@ -371,13 +382,29 @@ function StudentList() {
     async () => {
       setLoading(true);
       try {
+        const headers = getAuthHeaders();
+        if (!headers) return;
+
         const query = admissionTypeFilter ? `?admissionType=${admissionTypeFilter}` : "";
-        const res = await fetchWithRetry(`http://localhost:5000/api/students${query}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("facultyToken")}` },
+        const res = await fetchWithRetry(`/api/superadmin/students${query}`, {
+          headers,
         });
+        
+        if (res.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/');
+          return;
+        }
+        
         setStudents(res.data);
         setFetchError(null);
       } catch (err) {
+        // Handle authentication errors
+        if (err.response?.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/');
+          return;
+        }
         setFetchError(err.response?.data?.error || "Failed to fetch students.");
       } finally {
         setLoading(false);
@@ -390,11 +417,26 @@ function StudentList() {
     fetchStudents();
     const fetchSemesters = async () => {
       try {
-        const res = await fetchWithRetry("http://localhost:5000/api/superadmin/semesters", {
-          headers: { Authorization: `Bearer ${localStorage.getItem("facultyToken")}` },
+        const headers = getAuthHeaders();
+        if (!headers) return;
+
+        const res = await fetchWithRetry("/api/superadmin/semesters", {
+          headers,
         });
+        
+        if (res.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/');
+          return;
+        }
+        
         setSemesters(res.data || []);
       } catch (err) {
+        if (err.response?.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/');
+          return;
+        }
         console.error("Failed to fetch semesters:", err);
       }
     };
@@ -442,13 +484,21 @@ function StudentList() {
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this student?")) {
       try {
-        await fetchWithRetry(`http://localhost:5000/api/students/${id}`, {
+        const headers = getAuthHeaders();
+        if (!headers) return;
+
+        await fetchWithRetry(`/api/superadmin/students/${id}`, {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${localStorage.getItem("facultyToken")}` },
+          headers,
         });
         fetchStudents();
         alert("Student deleted successfully!");
       } catch (err) {
+        if (err.response?.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/');
+          return;
+        }
         alert("Error deleting student: " + (err.response?.data?.error || err.message));
       }
     }
@@ -456,22 +506,46 @@ function StudentList() {
 
   const handlePromote = async (id) => {
     try {
-      const response = await fetchWithRetry(`http://localhost:5000/api/students/promote/${id}`, {
+      const headers = getAuthHeaders();
+      if (!headers) return;
+
+      const response = await fetchWithRetry(`/api/superadmin/students/promote/${id}`, {
         method: "PUT",
-        headers: { Authorization: `Bearer ${localStorage.getItem("facultyToken")}` },
+        headers,
       });
+      
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/');
+        return;
+      }
+      
       alert(response.data.message || "Student promoted successfully");
       fetchStudents();
     } catch (err) {
+      if (err.response?.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/');
+        return;
+      }
       alert("Error promoting student: " + (err.response?.data?.error || err.message));
     }
   };
 
   const openCertificateModal = async (studentId, type) => {
     try {
-      const res = await fetchWithRetry(`http://localhost:5000/api/students/${studentId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("facultyToken")}` },
+      const headers = getAuthHeaders();
+      if (!headers) return;
+
+      const res = await fetchWithRetry(`/api/superadmin/students/${studentId}`, {
+        headers,
       });
+      
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/');
+        return;
+      }
       setCertificateModal({
         open: true,
         studentId,
@@ -580,10 +654,13 @@ function StudentList() {
       const student = certificateModal.studentData;
       if (!student) throw new Error("Student data is missing");
 
-      await fetchWithRetry(`http://localhost:5000/api/students/generate-certificate/${studentId}`, {
+      const headers = getAuthHeaders();
+      if (!headers) return;
+
+      await fetchWithRetry(`/api/superadmin/students/generate-certificate/${studentId}`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("facultyToken")}`,
+          ...headers,
           "Content-Type": "application/json",
         },
         data: { type, reason, leavingDate, isCleared, completionStatus, progress, conduct, remarks, standard },
@@ -816,20 +893,45 @@ function StudentList() {
 
   const openBacklogModal = async (studentId) => {
     try {
-      const res = await fetchWithRetry(`http://localhost:5000/api/students/${studentId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("facultyToken")}` },
+      const headers = getAuthHeaders();
+      if (!headers) return;
+
+      const res = await fetchWithRetry(`/api/superadmin/students/${studentId}`, {
+        headers,
       });
+      
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/');
+        return;
+      }
+      
       const student = res.data;
       const semesterId = student.semester?._id || "";
       let semesterSubjects = [];
       if (semesterId && student.department?._id) {
         try {
+          const headers = getAuthHeaders();
+          if (!headers) return;
+
           const subjectsRes = await fetchWithRetry(
-            `http://localhost:5000/api/students/subjects/${semesterId}/${student.department._id}`,
-            { headers: { Authorization: `Bearer ${localStorage.getItem("facultyToken")}` } }
+            `/api/superadmin/students/subjects/${semesterId}/${student.department._id}`,
+            { headers }
           );
+          
+          if (subjectsRes.status === 401) {
+            localStorage.removeItem('token');
+            navigate('/');
+            return;
+          }
+          
           semesterSubjects = subjectsRes.data;
         } catch (err) {
+          if (err.response?.status === 401) {
+            localStorage.removeItem('token');
+            navigate('/');
+            return;
+          }
           console.error("Failed to fetch subjects:", err);
           setModalError("Failed to fetch subjects for the selected semester.");
         }
@@ -871,15 +973,30 @@ function StudentList() {
 
     if (semesterId && backlogModal.departmentId) {
       try {
+        const headers = getAuthHeaders();
+        if (!headers) return;
+
         const res = await fetchWithRetry(
-          `http://localhost:5000/api/students/subjects/${semesterId}/${backlogModal.departmentId}`,
-          { headers: { Authorization: `Bearer ${localStorage.getItem("facultyToken")}` } }
+          `/api/superadmin/students/subjects/${semesterId}/${backlogModal.departmentId}`,
+          { headers }
         );
+        
+        if (res.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/');
+          return;
+        }
+        
         if (res.data.length === 0) {
           setModalError("No subjects available for this semester and department.");
         }
         setBacklogModal((prev) => ({ ...prev, semesterSubjects: res.data }));
       } catch (err) {
+        if (err.response?.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/');
+          return;
+        }
         setModalError("Failed to fetch subjects: " + (err.response?.data?.error || err.message));
       } finally {
         setLoadingSubjects(false);
@@ -908,13 +1025,24 @@ function StudentList() {
       
       if (status === "Failed") {
         // Add backlog for failed subjects
-        const response = await fetchWithRetry(`http://localhost:5000/api/students/${studentId}/add-backlog`, {
+        const headers = getAuthHeaders();
+        if (!headers) return;
+
+        const response = await fetchWithRetry(`/api/superadmin/students/${studentId}/add-backlog`, {
           method: "POST",
           headers: {
+            ...headers,
             "Content-Type": "application/json",
           },
           data: { subjectIds: [subjectId], semesterId },
         });
+        
+        if (response.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/');
+          return;
+        }
+        
         updatedStudent = response.data.student;
       } else if (status === "Passed") {
         // For passed subjects, check if there's an existing backlog to clear
@@ -927,13 +1055,23 @@ function StudentList() {
         );
         
         if (backlog) {
-          const response = await fetchWithRetry(`http://localhost:5000/api/students/${studentId}/update-backlog/${backlog._id}`, {
+          const headers = getAuthHeaders();
+          if (!headers) return;
+
+          const response = await fetchWithRetry(`/api/superadmin/students/${studentId}/update-backlog/${backlog._id}`, {
             method: "PUT",
             headers: {
+              ...headers,
               "Content-Type": "application/json",
             },
             data: { status: "Cleared" },
           });
+          
+          if (response.status === 401) {
+            localStorage.removeItem('token');
+            navigate('/');
+            return;
+          }
           updatedStudent = response.data.student;
         } else {
           // If no backlog exists, create or update semester record with Passed status
@@ -976,13 +1114,24 @@ function StudentList() {
             });
           }
           
-          const response = await fetchWithRetry(`http://localhost:5000/api/students/${studentId}`, {
+          const headers = getAuthHeaders();
+          if (!headers) return;
+
+          const response = await fetchWithRetry(`/api/superadmin/students/${studentId}`, {
             method: "PUT",
             headers: {
+              ...headers,
               "Content-Type": "application/json",
             },
             data: { semesterRecords },
           });
+          
+          if (response.status === 401) {
+            localStorage.removeItem('token');
+            navigate('/');
+            return;
+          }
+          
           updatedStudent = response.data;
         }
       }
@@ -1005,6 +1154,14 @@ function StudentList() {
       
     } catch (err) {
       console.error('Error in handleSubjectStatusUpdate:', err);
+      
+      // Handle authentication errors
+      if (err.response?.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/');
+        return;
+      }
+      
       setModalError(err.response?.data?.error || "Failed to update subject status.");
     }
   };
