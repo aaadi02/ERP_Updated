@@ -106,6 +106,27 @@ const Sidebar = ({ setSection, isCollapsed, toggleSidebar, isMobile, mobileMenuO
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 14l9-5-9-5-9 5 9 5zm0 7v-7" />
         </svg>
       )
+    },
+    {
+      id: 'busManagement',
+      label: 'Bus Management',
+      icon: (
+        <svg
+  className="w-5 h-5"
+  fill="none"
+  stroke="currentColor"
+  viewBox="0 0 24 24"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <path
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    strokeWidth={2}
+    d="M4 16V6a2 2 0 012-2h12a2 2 0 012 2v10M4 16h16M4 16v2a2 2 0 002 2h1a1 1 0 001-1v-1h8v1a1 1 0 001 1h1a2 2 0 002-2v-2M6 8h.01M18 8h.01M8 12h8"
+  />
+</svg>
+
+      )
     }
   ];
   

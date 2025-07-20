@@ -1,7 +1,7 @@
 import express from "express";
 import mongoose from "mongoose";
 import Faculty from "../models/faculty.js";
-import Student from "../models/student.js";
+import Student from "../models/StudentManagement.js";
 import AdminSubject from "../models/AdminSubject.js";
 import AcademicDepartment from "../models/AcademicDepartment.js";
 import Attendance from "../models/attendance.js";
@@ -383,3 +383,4 @@ router.get("/attendance/:subjectId", async (req, res) => {
 });
 
 export default router;
+

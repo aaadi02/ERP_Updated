@@ -115,7 +115,7 @@ const Login = () => {
               navigate('/dashboard/student');
               break;
             case 'driver':
-              navigate('/dashboard/driver');
+              navigate('/dashboard/driver/bus-details');
               break;
             case 'conductor':
               navigate('/dashboard/conductor');
