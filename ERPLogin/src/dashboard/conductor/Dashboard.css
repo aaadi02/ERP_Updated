@@ -1,0 +1,105 @@
+.bus-info-card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  max-width: 600px;
+  margin: 20px auto;
+}
+
+.bus-info-card h2 {
+  color: #2c3e50;
+  margin-bottom: 20px;
+  font-size: 24px;
+  text-align: center;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.info-row:last-of-type {
+  border-bottom: none;
+}
+
+.info-label {
+  color: #7f8c8d;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.info-value {
+  color: #2c3e50;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.status-on-time {
+  color: #2ecc71;
+}
+
+.status-delayed {
+  color: #e74c3c;
+}
+
+.status-maintenance {
+  color: #f1c40f;
+}
+
+.attendance-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 2px solid #eee;
+}
+
+.attendance-section h3 {
+  color: #2c3e50;
+  font-size: 18px;
+  margin-bottom: 15px;
+}
+
+.loading-spinner {
+  text-align: center;
+  padding: 40px;
+  color: #7f8c8d;
+  font-size: 16px;
+}
+
+.error-message {
+  text-align: center;
+  padding: 20px;
+  color: #e74c3c;
+  background: #fde8e8;
+  border-radius: 4px;
+  margin: 20px;
+}
+
+.no-bus {
+  text-align: center;
+  padding: 20px;
+  color: #7f8c8d;
+  background: #f8f9fa;
+  border-radius: 4px;
+  margin: 20px;
+}
+
+@media (max-width: 768px) {
+  .bus-info-card {
+    margin: 10px;
+    padding: 15px;
+  }
+
+  .info-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  .info-value {
+    margin-left: 0;
+  }
+} 

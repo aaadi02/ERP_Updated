@@ -4,6 +4,7 @@ import { protect } from "../middleware/auth.js";
 import {
   facultyRegister,
   staffLogin,
+  roleLogin,
   updatePassword,
   updateFaculty,
   deleteFaculty,
@@ -47,6 +48,7 @@ router.post(
   facultyRegister
 );
 router.post("/login", staffLogin);
+router.post("/rolelogin", roleLogin);
 router.post("/updatepassword", updatePassword);
 router.put("/update/:email", updateFaculty);
 router.delete("/delete/:facultyId", deleteFaculty);

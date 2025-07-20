@@ -1,0 +1,246 @@
+/* StudentManagement.css */
+
+.student-management-container {
+  min-height: 100vh;
+  background-color: #f9fafb;
+}
+
+.student-card {
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.student-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.student-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #e5e7eb;
+  overflow: hidden;
+  position: relative;
+}
+
+.student-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.student-avatar span {
+  color: #6b7280;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.login-access-toggle {
+  transition: all 0.2s ease-in-out;
+}
+
+.login-access-toggle:hover {
+  transform: scale(1.05);
+}
+
+.login-enabled {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.login-enabled:hover {
+  background-color: #bbf7d0;
+}
+
+.login-disabled {
+  background-color: #fecaca;
+  color: #991b1b;
+}
+
+.login-disabled:hover {
+  background-color: #fca5a5;
+}
+
+.action-button {
+  padding: 8px;
+  border-radius: 8px;
+  transition: all 0.2s ease-in-out;
+  color: #3b82f6;
+}
+
+.action-button:hover {
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  transform: scale(1.1);
+}
+
+.search-input {
+  padding-left: 2.5rem;
+  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.search-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #3b82f6;
+  border-color: #3b82f6;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 50;
+}
+
+.modal-content {
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  max-width: 64rem;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.status-badge.active {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.status-badge.inactive {
+  background-color: #fecaca;
+  color: #991b1b;
+}
+
+.loading-spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+  border-radius: 50%;
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid #e5e7eb;
+  border-top-color: #3b82f6;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.section-card {
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.info-item label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+  display: block;
+}
+
+.info-item p {
+  color: #111827;
+  margin-top: 0.25rem;
+}
+
+.student-profile-section {
+  background-color: #f9fafb;
+  border-radius: 8px;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.student-profile-image {
+  width: 8rem;
+  height: 8rem;
+  margin: 0 auto;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid white;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.student-profile-fallback {
+  width: 8rem;
+  height: 8rem;
+  margin: 0 auto;
+  border-radius: 50%;
+  background-color: #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 4px solid white;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.student-profile-name {
+  margin-top: 1rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.student-profile-id {
+  color: #3b82f6;
+  font-weight: 500;
+}
+
+.close-button {
+  color: #9ca3af;
+  transition: color 0.2s ease-in-out;
+}
+
+.close-button:hover {
+  color: #6b7280;
+}
+
+@media (max-width: 768px) {
+  .modal-content {
+    margin: 1rem;
+    max-width: calc(100% - 2rem);
+  }
+  
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .student-card {
+    margin-bottom: 1rem;
+  }
+}

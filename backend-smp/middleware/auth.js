@@ -1,6 +1,8 @@
 // backend/middleware/auth.js
 import jwt from "jsonwebtoken";
 import Faculty from "../models/faculty.js"; // Ensure Faculty model is correctly imported
+import Conductor from "../models/Conductor.js";
+import Driver from "../models/Driver.js";
 
 // Middleware for general authentication
 const protect = async (req, res, next) => {
@@ -35,6 +37,117 @@ const protect = async (req, res, next) => {
   }
 };
 
+// Middleware specifically for conductor authentication
+const protectConductor = async (req, res, next) => {
+  let token;
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith("Bearer")
+  ) {
+    try {
+      token = req.headers.authorization.split(" ")[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      
+      console.log("🔐 Conductor auth - decoded token:", decoded);
+
+      // Check if user is a conductor
+      if (decoded.role !== 'conductor' && decoded.type !== 'conductor') {
+        return res.status(403).json({ 
+          success: false,
+          error: "Access denied. Conductor role required." 
+        });
+      }
+
+      // Attach decoded token to req
+      req.user = decoded;
+      req.conductor = decoded;
+
+      // Verify conductor exists in database
+      const conductor = await Conductor.findById(decoded.id);
+      if (!conductor) {
+        return res.status(401).json({ 
+          success: false,
+          error: "Conductor not found" 
+        });
+      }
+
+      console.log(`✅ Conductor authenticated: ${conductor.personalInfo?.firstName} (${decoded.employeeId})`);
+      next();
+    } catch (error) {
+      console.error("❌ Conductor auth error:", error);
+      return res.status(401).json({ 
+        success: false,
+        error: "Not authorized, token failed" 
+      });
+    }
+  } else {
+    return res.status(401).json({ 
+      success: false,
+      error: "Not authorized, no token" 
+    });
+  }
+};
+
+// Middleware specifically for driver authentication
+const protectDriver = async (req, res, next) => {
+  let token;
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith("Bearer")
+  ) {
+    try {
+      token = req.headers.authorization.split(" ")[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      
+      console.log("🔐 Driver auth - decoded token:", decoded);
+
+      // Check if user is a driver
+      if (decoded.role !== 'driver' && decoded.type !== 'driver') {
+        return res.status(403).json({ 
+          success: false,
+          error: "Access denied. Driver role required." 
+        });
+      }
+
+      // Attach decoded token to req
+      req.user = decoded;
+      req.driver = decoded;
+
+      // Verify driver exists in database
+      const driver = await Driver.findById(decoded.id);
+      if (!driver) {
+        // Try to find by email if ID lookup fails
+        if (decoded.email) {
+          const driverByEmail = await Driver.findOne({ 'personalInfo.email': decoded.email });
+          if (driverByEmail) {
+            req.user = { ...decoded, _id: driverByEmail._id };
+            console.log(`✅ Driver authenticated by email: ${driverByEmail.personalInfo?.firstName} (${decoded.employeeId || decoded.email})`);
+            return next();
+          }
+        }
+        return res.status(401).json({ 
+          success: false,
+          error: "Driver not found" 
+        });
+      }
+
+      console.log(`✅ Driver authenticated: ${driver.personalInfo?.firstName} (${decoded.employeeId})`);
+      next();
+    } catch (error) {
+      console.error("❌ Driver auth error:", error);
+      return res.status(401).json({ 
+        success: false,
+        error: "Not authorized, token failed" 
+      });
+    }
+  } else {
+    return res.status(401).json({ 
+      success: false,
+      error: "Not authorized, no token" 
+    });
+  }
+};
+
 // Middleware to validate HOD department access
 const validateHODDepartment = async (req, res, next) => {
   try {
@@ -65,4 +178,4 @@ const restrictToAccountSection = async (req, res, next) => {
   next();
 };
 
-export { protect, validateHODDepartment, restrictToAccountSection };
+export { protect, protectConductor, protectDriver, validateHODDepartment, restrictToAccountSection };

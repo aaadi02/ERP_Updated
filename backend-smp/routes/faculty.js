@@ -1,8 +1,12 @@
 import express from "express";
 import Faculty from "../models/faculty.js";
 import bcrypt from "bcrypt";
+import { roleLogin } from "../controllers/facultyController.js";
 
 const router = express.Router();
+
+// Role-based login for faculty
+router.post("/rolelogin", roleLogin);
 
 // Create faculty
 router.post("/", async (req, res) => {

@@ -7,6 +7,7 @@ import path from "path";
 import util from "util";
 import multer from "multer";
 import cloudinary from "../config/cloudinary.js";
+import { protect } from "../middleware/auth.js";
 
 const router = express.Router();
 const execPromise = util.promisify(exec);
@@ -24,6 +25,14 @@ const upload = multer({
       cb(new Error("Only JPEG and PNG files are allowed"), false);
     }
   },
+});
+
+// Add authentication middleware to all routes
+router.use(protect);
+
+// Test endpoint
+router.get("/test", (req, res) => {
+  res.json({ message: "Student routes are working", user: req.user });
 });
 
 // Get all students (for dashboard)
@@ -1037,4 +1046,46 @@ router.post("/generate-certificate/:id", async (req, res) => {
   }
 });
 
+// Toggle student login access
+router.patch("/:id/toggle-access", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { loginEnabled } = req.body;
+
+    // Validate the input
+    if (typeof loginEnabled !== 'boolean') {
+      return res.status(400).json({ 
+        error: "loginEnabled must be a boolean value" 
+      });
+    }
+
+    // Find and update the student
+    const student = await Student.findByIdAndUpdate(
+      id,
+      { loginEnabled },
+      { new: true, runValidators: true }
+    ).populate("department", "name")
+     .populate("stream", "name");
+
+    if (!student) {
+      return res.status(404).json({ 
+        error: "Student not found" 
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Student login access ${loginEnabled ? 'enabled' : 'disabled'} successfully`,
+      student
+    });
+  } catch (err) {
+    console.error("Error toggling student access:", err);
+    res.status(500).json({ 
+      error: "Failed to toggle student access",
+      details: err.message 
+    });
+  }
+});
+
 export default router;
+

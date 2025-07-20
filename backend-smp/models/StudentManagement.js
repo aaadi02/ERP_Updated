@@ -272,6 +272,10 @@ const studentSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    loginEnabled: {
+      type: Boolean,
+      default: true,
+    },
     semesterRecords: [semesterRecordSchema],
     backlogs: [backlogSchema],
   },
