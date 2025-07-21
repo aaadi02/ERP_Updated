@@ -38,7 +38,7 @@ const App = () => {
         if (location.pathname === "/login" || location.pathname === "/") {
           if (userRole === "principal") {
             navigate("/principal-dashboard");
-          } else if (userRole === "HOD") {
+          } else if (userRole === "HOD" || userRole === "hod") {
             navigate("/hod-dashboard");
           } else if (userRole === "cc") {
             navigate("/cc-dashboard");
@@ -83,7 +83,7 @@ const App = () => {
 
     if (role === "principal") {
       navigate("/principal-dashboard");
-    } else if (role === "HOD") {
+    } else if (role === "HOD" || role === "hod") {
       navigate("/hod-dashboard");
     } else if (role === "cc") {
       navigate("/cc-dashboard");
@@ -135,7 +135,7 @@ const App = () => {
                   isAuthenticated
                     ? userData?.role === "principal"
                       ? "/principal-dashboard"
-                      : userData?.role === "HOD"
+                      : userData?.role === "HOD" || userData?.role === "hod"
                       ? "/hod-dashboard"
                       : "/dashboard"
                     : "/login"
@@ -151,7 +151,7 @@ const App = () => {
                   to={
                     userData?.role === "principal"
                       ? "/principal-dashboard"
-                      : userData?.role === "HOD"
+                      : userData?.role === "HOD" || userData?.role === "hod"
                       ? "/hod-dashboard"
                       : userData?.role === "cc"
                       ? "/cc-dashboard"
