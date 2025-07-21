@@ -31,7 +31,7 @@ import {
   assignPrincipal,
 } from "../controllers/facultyHistoryController.js";
 import Department from "../models/Department.js";
-import Student from "../models/student.js";
+import Student from "../models/StudentManagement.js";
 import Subject from "../models/Subject.js";
 import AdminSubject from "../models/AdminSubject.js";
 import Faculty from "../models/faculty.js";
@@ -527,4 +527,55 @@ router.get("/debug/check-department-names", async (req, res) => {
   }
 });
 
+// Get faculty status for dashboard
+router.get("/status", protect, async (req, res) => {
+  try {
+    // Get total faculty count
+    const totalFaculty = await Faculty.countDocuments({});
+    
+    // Get active faculty count
+    const activeFaculty = await Faculty.countDocuments({ 
+      employmentStatus: "Permanent Employee" 
+    });
+    
+    // Calculate total salary paid (mock data for now)
+    const totalPaid = activeFaculty * 50000; // Average salary estimate
+    
+    // Mock data for other stats - these would come from other models in real implementation
+    const incomeTax = {
+      totalLiability: activeFaculty * 5000,
+      processed: activeFaculty - 2
+    };
+    
+    const pf = {
+      totalEmployeePF: activeFaculty * 3000,
+      compliant: activeFaculty - 1
+    };
+    
+    const compliance = {
+      pfCompliant: activeFaculty - 1,
+      totalEmployees: activeFaculty
+    };
+    
+    res.json({
+      success: true,
+      totalFaculty,
+      activeFaculty,
+      totalPaid,
+      incomeTax,
+      pf,
+      gratuity: activeFaculty * 2000,
+      compliance
+    });
+  } catch (error) {
+    console.error('Error fetching faculty status:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error fetching faculty status',
+      error: error.message 
+    });
+  }
+});
+
 export default router;
+

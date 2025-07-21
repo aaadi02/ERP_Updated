@@ -1,4 +1,4 @@
-import Student from '../models/student.js';
+import Student from '../models/StudentManagement.js';
 import Faculty from '../models/faculty.js';
 import Attendance from '../models/attendance.js';
 import AccountStudent from '../models/AccountStudent.js';
@@ -411,3 +411,4 @@ export const getAttendanceReportWithFullDetails = async (req, res) => {
     });
   }
 };
+
