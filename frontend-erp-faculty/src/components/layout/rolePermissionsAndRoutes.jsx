@@ -436,6 +436,7 @@ export const rolePermissionsAndRoutes = [
       "fetched_timetable",
       "files",
       "department_students",
+      "academic_calendar",
     ],
     routes: [
       // Same routes as HOD but with lowercase role
@@ -455,6 +456,138 @@ export const rolePermissionsAndRoutes = [
         ),
       },
       {
+        path: "/dashboard/profile",
+        element: (isAuthenticated, userRole, userData) => (
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            userRole={userRole}
+            routeName="profile"
+          >
+            <Profile userData={userData} />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/dashboard/payslip",
+        element: (isAuthenticated, userRole, userData) => (
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            userRole={userRole}
+            routeName="payslip"
+          >
+            <PaySlip userData={userData} />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/dashboard/timetable",
+        element: (isAuthenticated, userRole, userData) => (
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            userRole={userRole}
+            routeName="timetable"
+          >
+            <Timetable userData={userData} />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/dashboard/compose-hod-announcement",
+        element: (isAuthenticated, userRole, userData) => (
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            userRole={userRole}
+            routeName="compose_hod_announcement"
+          >
+            <ComposeByHOD userData={userData} />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/dashboard/applyChargeHandover",
+        element: (isAuthenticated, userRole, userData) => (
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            userRole={userRole}
+            routeName="apply_charge_handover"
+          >
+            <ApplyChargeHandoverForm userData={userData} />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/dashboard/approveChargeHandover",
+        element: (isAuthenticated, userRole, userData) => (
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            userRole={userRole}
+            routeName="approve_charge_handover"
+          >
+            <ApproveChargeHandover userData={userData} />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/dashboard/applyleave",
+        element: (isAuthenticated, userRole, userData) => (
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            userRole={userRole}
+            routeName="apply_leave"
+          >
+            <ApplyLeave userData={userData} />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/dashboard/approveleave",
+        element: (isAuthenticated, userRole, userData) => (
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            userRole={userRole}
+            routeName="approve_leave"
+          >
+            <ApproveLeave userData={userData} />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/dashboard/applyodleave",
+        element: (isAuthenticated, userRole, userData) => (
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            userRole={userRole}
+            routeName="apply_od_leave"
+          >
+            <ApplyODLeave userData={userData} />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/dashboard/approveodleave",
+        element: (isAuthenticated, userRole, userData) => (
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            userRole={userRole}
+            routeName="approve_od_leave"
+          >
+            <ApproveODLeave userData={userData} />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/dashboard/departmentfaculty",
+        element: (isAuthenticated, userRole, userData) => (
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            userRole={userRole}
+            routeName="all_staff"
+          >
+            <DepartmentFaculty userData={userData} />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: "/dashboard/department-students",
         element: (isAuthenticated, userRole, userData) => (
           <ProtectedRoute
@@ -463,6 +596,66 @@ export const rolePermissionsAndRoutes = [
             routeName="department_students"
           >
             <DepartmentStudents userData={userData} />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/dashboard/academic-calendar",
+        element: (isAuthenticated, userRole, userData) => (
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            userRole={userRole}
+            routeName="academic_calendar"
+          >
+            <AcademicCalendar userData={userData} />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/dashboard/fetched-timetable",
+        element: (isAuthenticated, userRole, userData) => (
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            userRole={userRole}
+            routeName="fetched_timetable"
+          >
+            <FetchedTimetable userData={userData} />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/dashboard/sent-charge-handover",
+        element: (isAuthenticated, userRole, userData) => (
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            userRole={userRole}
+            routeName="sent_charge_handover"
+          >
+            <SentChargeHandover userData={userData} />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/dashboard/files",
+        element: (isAuthenticated, userRole, userData) => (
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            userRole={userRole}
+            routeName="files"
+          >
+            <FilesPage userData={userData} />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/dashboard/student-feedback",
+        element: (isAuthenticated, userRole, userData) => (
+          <ProtectedRoute
+            isAuthenticated={isAuthenticated}
+            userRole={userRole}
+            routeName="student_feedback"
+          >
+            <StudentFeedback userData={userData} />
           </ProtectedRoute>
         ),
       },

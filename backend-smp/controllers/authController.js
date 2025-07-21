@@ -188,8 +188,8 @@ const login = async (req, res) => {
       // First check for special roles (highest priority)
       if (user.role === "principal") {
         facultyRole = "principal";
-      } else if (user.role === "hod") {
-        facultyRole = "HOD";
+      } else if (user.role === "hod" || user.role === "HOD") {
+        facultyRole = "hod";
       }
       // Check for CC assignment (active CC assignments)
       else if (user.ccAssignments && user.ccAssignments.length > 0) {
@@ -213,7 +213,7 @@ const login = async (req, res) => {
       } else if (user.type === "teaching") {
         facultyRole = "teaching";
       } else if (user.type === "HOD") {
-        facultyRole = "HOD";
+        facultyRole = "hod";
       } else if (user.type === "principal") {
         facultyRole = "principal";
       }

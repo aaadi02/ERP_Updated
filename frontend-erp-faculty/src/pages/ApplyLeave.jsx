@@ -8,7 +8,7 @@ const ApplyLeave = ({ userData }) => {
     firstName: userData?.firstName || "",
     leaveType: "Sick Leave",
     type:
-      userData?.role === "HOD"
+      userData?.role === "HOD" || userData?.role === "hod"
         ? "HOD"
         : userData?.role === "principal"
         ? "Principal"
@@ -32,7 +32,7 @@ const ApplyLeave = ({ userData }) => {
         employeeId: userData.employeeId,
         firstName: userData.firstName || prev.firstName,
         type:
-          userData.role === "HOD"
+          userData.role === "HOD" || userData.role === "hod"
             ? "HOD"
             : userData.role === "principal"
             ? "Principal"
@@ -85,12 +85,15 @@ const ApplyLeave = ({ userData }) => {
     setMessage("");
 
     try {
-      const response = await axios.post("http://localhost:5000/api/leave/apply", {
-        ...formData,
-        employeeId: userData?.employeeId,
-        firstName: userData?.firstName,
-        department: userData?.department,
-      });
+      const response = await axios.post(
+        "http://localhost:5000/api/leave/apply",
+        {
+          ...formData,
+          employeeId: userData?.employeeId,
+          firstName: userData?.firstName,
+          department: userData?.department,
+        }
+      );
 
       if (response.status === 201) {
         setMessage("✅ Leave application submitted successfully!");
@@ -123,7 +126,7 @@ const ApplyLeave = ({ userData }) => {
         <div className="absolute -bottom-20 -right-20 w-96 h-96 bg-gradient-to-r from-purple-400/20 to-pink-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-gradient-to-r from-cyan-400/10 to-blue-400/10 rounded-full blur-3xl animate-pulse delay-500"></div>
       </div>
-      
+
       <div className="relative z-10 px-4 sm:px-6 lg:px-8 py-12">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
@@ -132,7 +135,8 @@ const ApplyLeave = ({ userData }) => {
               📝 Leave Application
             </h1>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Submit your leave request with ease and track your application status
+              Submit your leave request with ease and track your application
+              status
             </p>
           </div>
 
@@ -188,7 +192,9 @@ const ApplyLeave = ({ userData }) => {
                       </p>
                     </div>
                     <div className="p-4 bg-white/50 rounded-xl border border-gray-100">
-                      <span className="font-semibold text-gray-700 block mb-1">Name</span>
+                      <span className="font-semibold text-gray-700 block mb-1">
+                        Name
+                      </span>
                       <p className="text-gray-800 font-medium">
                         {userData?.firstName || "Loading..."}
                       </p>
@@ -206,7 +212,10 @@ const ApplyLeave = ({ userData }) => {
                       <select
                         value={formData.leaveType}
                         onChange={(e) =>
-                          setFormData({ ...formData, leaveType: e.target.value })
+                          setFormData({
+                            ...formData,
+                            leaveType: e.target.value,
+                          })
                         }
                         className="w-full px-4 py-3 bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 hover:bg-white/90 focus:bg-white shadow-sm"
                       >
@@ -224,7 +233,10 @@ const ApplyLeave = ({ userData }) => {
                       <select
                         value={formData.leaveDuration}
                         onChange={(e) =>
-                          setFormData({ ...formData, leaveDuration: e.target.value })
+                          setFormData({
+                            ...formData,
+                            leaveDuration: e.target.value,
+                          })
                         }
                         className="w-full px-4 py-3 bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 hover:bg-white/90 focus:bg-white shadow-sm"
                       >
@@ -261,7 +273,10 @@ const ApplyLeave = ({ userData }) => {
                         type="date"
                         value={formData.startDate}
                         onChange={(e) =>
-                          setFormData({ ...formData, startDate: e.target.value })
+                          setFormData({
+                            ...formData,
+                            startDate: e.target.value,
+                          })
                         }
                         className="w-full px-4 py-3 bg-white/70 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300 hover:bg-white/90 focus:bg-white shadow-sm"
                       />
@@ -338,7 +353,7 @@ const ApplyLeave = ({ userData }) => {
                         <span>Submitting...</span>
                       </div>
                     ) : (
-                      '📤 Submit Application'
+                      "📤 Submit Application"
                     )}
                   </button>
 

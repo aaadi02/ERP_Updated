@@ -97,6 +97,7 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
     director: "Director",
     principal: "Principal",
     HOD: "Head of Department",
+    hod: "Head of Department",
     teaching: "Teacher",
     nonteaching: "Non-Teaching Staff",
     "non-teaching": "Non-Teaching Staff",
@@ -104,7 +105,8 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
   };
 
   const getAnnouncementRoute = (role) => {
-    if (role === "HOD") return "/dashboard/compose-hod-announcement";
+    if (role === "HOD" || role === "hod")
+      return "/dashboard/compose-hod-announcement";
     if (role === "principal")
       return "/dashboard/compose-principal-announcement";
     if (role === "nonteaching" || role === "non-teaching")
@@ -118,19 +120,20 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
   };
 
   const getAnnouncementTitle = (role) => {
-    if (role === "HOD" || role === "principal") return "Compose Announcement";
+    if (role === "HOD" || role === "hod" || role === "principal")
+      return "Compose Announcement";
     return "Announcements";
   };
 
   const getDashboardRoute = (role) => {
-    if (role === "HOD") return "/hod-dashboard";
+    if (role === "HOD" || role === "hod") return "/hod-dashboard";
     if (role === "principal") return "/principal-dashboard";
     if (role === "cc") return "/cc-dashboard";
     return "/dashboard";
   };
 
   const getAllStaffRoute = (role) => {
-    if (role === "HOD") return "/dashboard/departmentfaculty";
+    if (role === "HOD" || role === "hod") return "/dashboard/departmentfaculty";
     return "/dashboard/allstaff";
   };
 
@@ -161,7 +164,7 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
       routeName: "payslip",
     },
     // Staff Management Section
-    ...(userData?.role === "HOD"
+    ...(userData?.role === "HOD" || userData?.role === "hod"
       ? [
           {
             title: "Department Faculty",
@@ -206,7 +209,7 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
       icon: <MessageSquare size={20} />,
       href: getAnnouncementRoute(userData?.role),
       routeName:
-        userData?.role === "HOD"
+        userData?.role === "HOD" || userData?.role === "hod"
           ? "compose_hod_announcement"
           : userData?.role === "principal"
           ? "compose_principal_announcement"
@@ -218,7 +221,7 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
       sectionTitle: "Communication",
     },
     // Student Feedback for HOD
-    ...(userData?.role === "HOD"
+    ...(userData?.role === "HOD" || userData?.role === "hod"
       ? [
           {
             title: "Student Feedback",
@@ -275,7 +278,7 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
           },
         ]
       : []),
-    ...(userData?.role === "HOD"
+    ...(userData?.role === "HOD" || userData?.role === "hod"
       ? [
           {
             title: "Approve Leave",
@@ -291,7 +294,7 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
       href: "/dashboard/applyodleave",
       routeName: "apply_od_leave",
     },
-    ...(userData?.role === "HOD"
+    ...(userData?.role === "HOD" || userData?.role === "hod"
       ? [
           {
             title: "Approve OD Leave",
@@ -310,7 +313,7 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
       isSection: true,
       sectionTitle: "Handover Management",
     },
-    ...(userData?.role === "HOD"
+    ...(userData?.role === "HOD" || userData?.role === "hod"
       ? [
           {
             title: "Approve Charge Handover",
@@ -394,7 +397,7 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="rounded-2xl p-3 shadow-lg transition-all duration-300 hover:scale-110 bg-gradient-to-br from-blue-500 to-emerald-500 shadow-blue-400/30 hover:shadow-blue-400/50">
-                {userData?.role === "HOD" ? (
+                {userData?.role === "HOD" || userData?.role === "hod" ? (
                   <Crown className="text-white drop-shadow-sm" size={26} />
                 ) : userData?.role === "cc" ? (
                   <Award className="text-white drop-shadow-sm" size={26} />
@@ -404,7 +407,7 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
               </div>
               <div>
                 <h2 className="text-xl font-bold tracking-tight text-white transition-colors duration-300 drop-shadow-sm">
-                  {userData?.role === "HOD"
+                  {userData?.role === "HOD" || userData?.role === "hod"
                     ? "HOD Portal"
                     : userData?.role === "principal"
                     ? "Principal Portal"
@@ -416,7 +419,7 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
                     ? "Staff Portal"
                     : "Admin Portal"}
                 </h2>
-                {userData?.role === "HOD" && (
+                {(userData?.role === "HOD" || userData?.role === "hod") && (
                   <p className="text-blue-200 text-sm font-medium">
                     {userData?.department} Department
                   </p>
@@ -500,7 +503,7 @@ const StaffSidebar = ({ isOpen, handleMenuClick, userData, onClose }) => {
                 <p className="text-sm font-semibold text-white truncate">
                   {userData?.email}
                 </p>
-                {userData?.role === "HOD" && (
+                {(userData?.role === "HOD" || userData?.role === "hod") && (
                   <span className="px-3 py-1 bg-gradient-to-r from-blue-500 to-emerald-500 text-white text-xs font-bold rounded-full shadow-sm">
                     HOD
                   </span>

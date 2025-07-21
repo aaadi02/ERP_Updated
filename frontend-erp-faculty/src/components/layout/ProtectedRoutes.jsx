@@ -13,14 +13,15 @@ const ProtectedRoute = ({ children, isAuthenticated, userRole, routeName }) => {
     return <Navigate to="/login" state={{ from: location }} />;
   }
   if (routeName && !rolePermissions[userRole]?.includes(routeName)) {
-    const dashboardUrl = userRole === "principal" 
-      ? "/principal-dashboard" 
-      : userRole === "HOD" 
-      ? "/hod-dashboard" 
-      : userRole === "cc" 
-      ? "/cc-dashboard" 
-      : "/dashboard";
-      
+    const dashboardUrl =
+      userRole === "principal"
+        ? "/principal-dashboard"
+        : userRole === "HOD" || userRole === "hod"
+        ? "/hod-dashboard"
+        : userRole === "cc"
+        ? "/cc-dashboard"
+        : "/dashboard";
+
     return (
       <div className="min-h-screen bg-gray-100 p-6">
         <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-8 text-center">

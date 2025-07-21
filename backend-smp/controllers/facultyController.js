@@ -368,29 +368,29 @@ const staffLogin = async (req, res) => {
 const roleLogin = async (req, res) => {
   try {
     const { employeeId, password } = req.body;
-    
+
     if (!employeeId || !password) {
-      return res.status(400).json({ 
-        error: "Employee ID and password are required" 
+      return res.status(400).json({
+        error: "Employee ID and password are required",
       });
     }
 
     // Import AuthFaculty model
     const AuthFaculty = (await import("../models/AuthFaculty.js")).default;
-    
+
     // Find faculty by employee ID
     const faculty = await AuthFaculty.findOne({ employeeId });
     if (!faculty) {
-      return res.status(404).json({ 
-        error: "Faculty not found with this Employee ID" 
+      return res.status(404).json({
+        error: "Faculty not found with this Employee ID",
       });
     }
 
     // Check password (assuming it's stored as plain text in your schema)
     // If you're using hashed passwords, use bcrypt.compare instead
     if (faculty.password !== password) {
-      return res.status(401).json({ 
-        error: "Invalid credentials" 
+      return res.status(401).json({
+        error: "Invalid credentials",
       });
     }
 
@@ -409,16 +409,15 @@ const roleLogin = async (req, res) => {
         designation: faculty.type, // Add designation for compatibility
         employmentStatus: faculty.employmentStatus,
         employeeId: faculty.employeeId,
-        department: faculty.department
+        department: faculty.department,
       },
-      token: token
+      token: token,
     });
-
   } catch (error) {
     console.error("Role login error:", error);
     return res.status(500).json({
       error: "Internal server error",
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -1142,6 +1141,14 @@ const deleteCCAssignment = async (req, res) => {
         success: false,
         message:
           "facultyId, academicYear, semester, section, and department are required",
+      });
+    }
+
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(facultyId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid faculty ID format",
       });
     }
 
