@@ -4,6 +4,7 @@
 // TODO: Replace with real API calls when backend is ready
 
 import React, { useEffect, useState, useContext, useMemo } from "react"
+import { Navigate } from "react-router-dom"
 import { AuthContext } from "../context/AuthContext"
 import {
   Users,

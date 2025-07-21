@@ -2,7 +2,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import IssueRecord from '../models/IssueRecord.js';
 import Book from '../models/Book.js';
-import Student from "../models/student.js";
+import Student from "../models/StudentManagement.js";
 import Faculty from "../models/faculty.js";
 import Issue from "../models/Issue.js";
 import { issueBookHandler, returnBookHandler, getBorrowedBooksByBorrower } from '../controllers/issueController.js';

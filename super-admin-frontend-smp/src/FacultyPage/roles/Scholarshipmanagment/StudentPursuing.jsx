@@ -1,11 +1,22 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import { CheckCircle, XCircle, Sun, Moon } from "lucide-react";
 
 const StudentPursuing = () => {
+  const navigate = useNavigate();
   const [theme, setTheme] = useState("light");
   const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
+
+  // Authentication helper function
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+  };
 
   // Theme classes based on AdmissionForm
   const themeClasses = {
@@ -70,6 +81,10 @@ const StudentPursuing = () => {
         const response = await axios(url, options);
         return response;
       } catch (err) {
+        // Don't retry on authentication errors
+        if (err.response?.status === 401) {
+          throw err;
+        }
         if (i === retries - 1) throw err;
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
@@ -79,16 +94,21 @@ const StudentPursuing = () => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const studentRes = await fetchWithRetry("http://localhost:5000/api/students", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("facultyToken")}` },
+      const studentRes = await fetchWithRetry("http://localhost:5000/api/superadmin/students", {
+        headers: getAuthHeaders(),
       });
       const scholarshipRes = await fetchWithRetry("http://localhost:5000/api/scholarships", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("facultyToken")}` },
+        headers: getAuthHeaders(),
       });
       setStudents(studentRes.data);
       setScholarships(scholarshipRes.data);
       setFetchError(null);
     } catch (err) {
+      if (err.response?.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/');
+        return;
+      }
       setFetchError(err.response?.data?.error || "Failed to fetch data. Please check your connection.");
     } finally {
       setLoading(false);
@@ -171,16 +191,18 @@ const StudentPursuing = () => {
 
       await fetchWithRetry("http://localhost:5000/api/scholarships", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("facultyToken")}`,
-          "Content-Type": "application/json",
-        },
+        headers: getAuthHeaders(),
         data: scholarshipData,
       });
       alert(`Scholarship status updated to ${status} for ${studentName}!`);
       fetchData();
       closeScholarshipModal();
     } catch (err) {
+      if (err.response?.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/');
+        return;
+      }
       console.error("Error updating scholarship status:", err);
       alert("Error updating scholarship status: " + (err.response?.data?.error || err.message));
     }

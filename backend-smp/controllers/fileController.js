@@ -1,6 +1,6 @@
 import File from "../models/File.js";
 import Attendance from "../models/attendance.js";
-import Student from "../models/student.js";
+import Student from "../models/StudentManagement.js";
 import Subject from "../models/Subject.js";
 import path from "path";
 import fs from "fs";
@@ -238,3 +238,4 @@ export {
   downloadStudentAttendance,
   fetchStudentAttendanceData,
 };
+

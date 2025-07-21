@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -34,6 +35,8 @@ ChartJS.register(
 );
 
 const SummaryPage = () => {
+  const navigate = useNavigate();
+  
   // State variables
   const [students, setStudents] = useState([]);
   const [castes, setCastes] = useState([]);
@@ -60,21 +63,47 @@ const SummaryPage = () => {
   // Theme toggle
   const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
 
+  // Helper function to get auth headers
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      localStorage.removeItem('token');
+      navigate('/');
+      return null;
+    }
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
+        // Get authentication headers
+        const headers = getAuthHeaders();
+        if (!headers) return;
+
         const [
           studentsResponse,
           castesResponse,
           departmentsResponse,
           streamsResponse,
         ] = await Promise.all([
-          fetch("http://localhost:5000/api/students"),
-          fetch("http://localhost:5000/api/superadmin/castes"),
-          fetch("http://localhost:5000/api/superadmin/departments"),
-          fetch("http://localhost:5000/api/streams"),
+          fetch("/api/superadmin/students", { headers }),
+          fetch("/api/superadmin/castes", { headers }),
+          fetch("/api/superadmin/departments", { headers }),
+          fetch("/api/superadmin/streams", { headers }),
         ]);
+
+        // Check for authentication errors
+        if (studentsResponse.status === 401 || castesResponse.status === 401 || 
+            departmentsResponse.status === 401 || streamsResponse.status === 401) {
+          localStorage.removeItem('token');
+          navigate('/');
+          return;
+        }
 
         if (!studentsResponse.ok)
           throw new Error(
@@ -105,6 +134,15 @@ const SummaryPage = () => {
 
         processData(studentsData, castesData, departmentsData, streamsData);
       } catch (error) {
+        console.error("Data fetching error:", error);
+        
+        // Handle authentication errors
+        if (error.message.includes('authentication') || error.message.includes('token')) {
+          localStorage.removeItem('token');
+          navigate('/');
+          return;
+        }
+        
         setError(error.message || "An error occurred while fetching data.");
       } finally {
         setIsLoading(false);
@@ -112,7 +150,7 @@ const SummaryPage = () => {
     };
 
     fetchData();
-  }, []);
+  }, [navigate]);
 
   const processData = (
     studentsData,

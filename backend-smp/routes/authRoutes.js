@@ -1,16 +1,16 @@
-const express = require('express');
+import express from "express.js";
 const router = express.Router();
-const {
+import {
   login,
   logout,
   protect,
   restrictTo,
   studentLogin
-} = require('../controllers/authController');
-const {
+} from "../controllers/authController.js";
+import {
   signup,
   getCurrentUser
-} = require('../controllers/userController');
+} from "../controllers/userController.js";
 
 router.post('/signup', signup);
 router.post('/login', login);

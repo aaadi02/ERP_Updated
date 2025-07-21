@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -22,6 +23,8 @@ ChartJS.register(
 );
 
 const Dashboard = () => {
+  const navigate = useNavigate();
+  
   // State for storing API data
   const [students, setStudents] = useState([]);
   const [faculties, setFaculties] = useState([]);
@@ -53,6 +56,22 @@ const Dashboard = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
+        // Get the token from localStorage
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+          // No token found, redirect to login
+          localStorage.removeItem('token');
+          navigate('/');
+          return;
+        }
+
+        // Create headers with authorization
+        const headers = {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        };
+
         const [
           studentsResponse,
           facultiesResponse,
@@ -60,18 +79,31 @@ const Dashboard = () => {
           streamsResponse,
         ] = await Promise.all([
           fetch(
-            "/api/superadmin/students"
+            "/api/superadmin/students",
+            { headers }
           ),
           fetch(
-            `/api/superadmin/faculties?role=${facultyRoleFilter}`
+            `/api/superadmin/faculties?role=${facultyRoleFilter}`,
+            { headers }
           ),
           fetch(
-            "/api/superadmin/departments"
+            "/api/superadmin/departments",
+            { headers }
           ),
           fetch(
-            "/api/superadmin/streams"
+            "/api/superadmin/streams",
+            { headers }
           ),
         ]);
+
+        // Check for authentication errors
+        if (studentsResponse.status === 401 || facultiesResponse.status === 401 || 
+            departmentsResponse.status === 401 || streamsResponse.status === 401) {
+          // Token is invalid or expired, redirect to login
+          localStorage.removeItem('token');
+          navigate('/');
+          return;
+        }
 
         if (!studentsResponse.ok)
           throw new Error("Failed to fetch students data");
@@ -137,6 +169,14 @@ const Dashboard = () => {
         setStudentsByStream(studentsByStreamData);
       } catch (error) {
         console.error("Data fetching error:", error);
+        
+        // Handle authentication errors
+        if (error.message.includes('authentication') || error.message.includes('token')) {
+          localStorage.removeItem('token');
+          navigate('/');
+          return;
+        }
+        
         setError("An error occurred while fetching data.");
       } finally {
         setIsLoading(false);
@@ -144,7 +184,7 @@ const Dashboard = () => {
     };
 
     fetchData();
-  }, [facultyRoleFilter]); // Re-run effect when facultyRoleFilter changes
+  }, [facultyRoleFilter, navigate]); // Re-run effect when facultyRoleFilter or navigate changes
 
   // Function to close all graphs except the specified one
   const toggleGraph = (graphToToggle) => {

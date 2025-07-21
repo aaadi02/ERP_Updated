@@ -53,7 +53,73 @@ router.get("/", async (req, res) => {
     });
   }
 });
+router.get('/dashboard', async (req, res) => {
+  try {
+    const { financialYear = '2024-2025' } = req.query;
+    
+    // Get unique employees from salary data
+    const employees = await Salary.aggregate([
+      {
+        $group: {
+          _id: '$name',
+          totalSalary: { $sum: '$amount' },
+          recordCount: { $sum: 1 },
+          latestRecord: { $last: '$$ROOT' }
+        }
+      },
+      {
+        $project: {
+          name: '$_id',
+          totalSalary: 1,
+          recordCount: 1,
+          latestMonth: '$latestRecord.month',
+          latestAmount: '$latestRecord.amount'
+        }
+      },
+      { $sort: { totalSalary: -1 } }
+    ]);
 
+    // Get PF data for these employees
+    const pfData = await PF.find({ financialYear }).lean();
+    const pfByEmployee = {};
+    pfData.forEach(pf => {
+      pfByEmployee[pf.employeeName] = pf;
+    });
+
+    // Get Income Tax data for these employees
+    const incomeTaxData = await IncomeTax.find({ financialYear }).lean();
+    const incomeTaxByEmployee = {};
+    incomeTaxData.forEach(it => {
+      incomeTaxByEmployee[it.employeeName] = it;
+    });
+
+    // Combine all data
+    const facultyData = employees.map(emp => ({
+      ...emp,
+      pf: pfByEmployee[emp.name] || null,
+      incomeTax: incomeTaxByEmployee[emp.name] || null,
+      hasCompleteData: !!(pfByEmployee[emp.name] && incomeTaxByEmployee[emp.name])
+    }));
+
+    // Summary statistics
+    const summary = {
+      totalEmployees: employees.length,
+      totalSalaryPaid: employees.reduce((sum, emp) => sum + emp.totalSalary, 0),
+      employeesWithPF: Object.keys(pfByEmployee).length,
+      employeesWithIncomeTax: Object.keys(incomeTaxByEmployee).length,
+      fullyCompliantEmployees: facultyData.filter(emp => emp.hasCompleteData).length
+    };
+
+    res.json({
+      summary,
+      facultyData,
+      financialYear
+    });
+  } catch (err) {
+    console.error('Error fetching faculty dashboard:', err);
+    res.status(500).json({ error: "Error fetching faculty dashboard" });
+  }
+});
 // Update employment status
 router.put("/:id/status", async (req, res) => {
   try {

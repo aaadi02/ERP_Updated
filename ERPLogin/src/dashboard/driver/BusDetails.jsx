@@ -23,6 +23,7 @@ const BusDetails = () => {
         // Get all buses and find the one assigned to current driver
         const response = await API.get('/buses');
         const buses = response.data.data.buses;
+        console.log('Fetched buses:', buses);
         
         // Find bus assigned to current driver
         const assignedBus = buses.find(bus => 

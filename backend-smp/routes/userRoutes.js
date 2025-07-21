@@ -1,15 +1,15 @@
-const express = require('express');
+import express from "express.js";
 const router = express.Router();
-const {
+import {
   protect,
   restrictTo
-} = require('../controllers/authController');
-const {
+} from "../controllers/authController.js";
+import {
   getAllUsers,
   getUser,
   updateUser,
   deleteUser
-} = require('../controllers/userController');
+} from "../controllers/userController.js";
 
 router.use(protect);
 

@@ -67,6 +67,27 @@ import routeRoutes from "./routes/routeRoutes.js";
 import scheduleRoutes from "./routes/scheduleRoutes.js";
 import problemRoutes from "./routes/problemRoutes.js";
 
+// Additional Financial and Management Routes
+import accountsRoutes from "./routes/accounts.js";
+import auditRoutes from "./routes/audit.js";
+import complianceRoutes from "./routes/compliance.js";
+import expensesRoutes from "./routes/expenses.js";
+import feeHeadsRoutes from "./routes/feeHeadRoutes.js";
+import gratuityRoutes from "./routes/gratuity.js";
+import incomeTaxRoutes from "./routes/incomeTax.js";
+import insuranceRoutes from "./routes/insurance.js";
+import integrationRoutes from "./routes/integration.js";
+import ledgerRoutes from "./routes/ledger.js";
+import maintenanceRoutes from "./routes/maintenance.js";
+import notificationsRoutes from "./routes/notifications.js";
+import paymentsRoutes from "./routes/payments.js";
+import pfRoutes from "./routes/pf.js";
+import purchaseRoutes from "./routes/purchase.js";
+import receiptsRoutes from "./routes/receipts.js";
+// import storeRoutes from "./routes/store.js";
+import usersRoutes from "./routes/users.js";
+import studentsFeeRoutes from "./routes/students.js"
+
 
 // Setup __dirname in ES module
 const __filename = fileURLToPath(import.meta.url);
@@ -161,6 +182,24 @@ app.get("/", (req, res) => {
 // Mount Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/student/auth", studentAuthRoutes);
+app.use("/api/accounts", accountsRoutes);
+app.use('/api/audit', auditRoutes);
+app.use('/api/compliance', complianceRoutes);
+app.use('/api/expenses', expensesRoutes);
+app.use("/api/fee-heads", feeHeadsRoutes);
+app.use('/api/gratuity', gratuityRoutes);
+app.use('/api/income-tax', incomeTaxRoutes);
+app.use("/api/insurance", insuranceRoutes);
+app.use('/api/integration', integrationRoutes);
+app.use('/api/ledger', ledgerRoutes);
+app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/notifications', notificationsRoutes);
+app.use("/api/payments", paymentsRoutes);
+app.use('/api/pf', pfRoutes);
+app.use('/api/purchase', purchaseRoutes);
+app.use('/api/receipts', receiptsRoutes);
+// app.use('/api/store', storeRoutes);
+app.use("/api/users", usersRoutes);
 app.use("/api/admin/auth", adminAuthRoutes);
 app.use("/api/superadmin", superAdminRoutes);
 app.use("/api/superadmin/students", studentManagementRoutes);
@@ -173,7 +212,7 @@ app.use("/api/superadmin/events", eventRoutes);
 app.use("/api/superadmin/semesters", semesterRoutes);
 app.use("/api/faculty", facultyAuthRoutes);
 app.use("/api/streams", streamRoutes);
-app.use("/api/students", studentManagementRoutes);
+app.use("/api/students", studentsFeeRoutes);
 app.use("/api/account", accountRoutes);
 app.use("/api/fee-headers", feeHeaderRoutes);
 app.use("/api/fee-payments", feePaymentRoutes);

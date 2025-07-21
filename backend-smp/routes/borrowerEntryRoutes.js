@@ -1,5 +1,5 @@
 import express from 'express';
-import Student from '../models/student.js';
+import Student from '../models/StudentManagement.js';
 import Faculty from '../models/faculty.js';
 import BorrowerEntry from '../models/BorrowerEntry.js';
 
@@ -61,3 +61,4 @@ router.get('/borrower-entry', async (req, res) => {
 });
 
 export default router;
+
