@@ -7,6 +7,7 @@ import Feedback from '../components/Feedback';
 import Library from '../components/Library';
 import MaterialList from '../components/MaterialList';
 import StudentScholarship from '../components/StudentScholarship';
+import StudentDashboard from './StudentDashboard';
 
 const Dashboard = () => {
   const [section, setSection] = useState('announcements');
@@ -209,6 +210,7 @@ const Dashboard = () => {
                 {section === 'feedback' && <Feedback studentId={studentData._id} />}
                 {section === 'library' && <Library studentId={studentData.studentId} />}
                 {section === 'scholarship' && <StudentScholarship />}
+                {section === 'busManagement' && <StudentDashboard />}
                 {section === 'materials' && (
                   <div>
                     <h2 className="text-xl font-bold mb-2">Study Materials</h2>

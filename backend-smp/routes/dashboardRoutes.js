@@ -1,13 +1,15 @@
 import express from "express";
 import mongoose from "mongoose";
 import Faculty from "../models/faculty.js";
-import Student from "../models/student.js";
+import Student from "../models/StudentManagement.js";
 import Attendance from "../models/attendance.js";
 import Task from "../models/taskModel.js";
 import Todo from "../models/Todo.js";
 import Leave from "../models/Leave.js";
 import jwt from "jsonwebtoken";
 import Department from "../models/Department.js";
+import ODLeave from "../models/ODLeave.js";
+import Timetable from "../models/timetable.js";
 
 const router = express.Router();
 
@@ -79,16 +81,16 @@ router.get("/hod-stats", authMiddleware, async (req, res) => {
         })
       : 0;
 
-    // Get pending tasks assigned to HOD
-    const pendingTasks = await Task.countDocuments({
-      assignedTo: req.user.id,
-      status: { $in: ["pending", "in-progress"] },
+    // Get pending tasks assigned to HOD (using Task model for charge handover)
+    const pendingHandoverTasks = await Task.countDocuments({
+      department: hodDepartment,
+      status: "pending_hod",
     });
 
-    // Get completed tasks by HOD
-    const completedTasks = await Task.countDocuments({
-      assignedTo: req.user.id,
-      status: "completed",
+    // Get completed tasks by HOD (using Task model)
+    const completedHandoverTasks = await Task.countDocuments({
+      department: hodDepartment,
+      status: "approved",
     });
 
     // Get pending leave requests for HOD's department
@@ -100,8 +102,8 @@ router.get("/hod-stats", authMiddleware, async (req, res) => {
     const stats = {
       totalFaculty,
       totalStudents,
-      pendingTasks,
-      completedTasks,
+      pendingHandoverTasks,
+      completedHandoverTasks,
       pendingLeaves: pendingLeaves,
       department: hodDepartment,
       todosCount: await Todo.countDocuments({ assignedTo: req.user.id }),
@@ -220,8 +222,6 @@ router.get("/principal-pending-approvals", authMiddleware, async (req, res) => {
     }
 
     // Get pending leave approvals for principal
-    const Leave = require("../models/Leave");
-    const ODLeave = require("../models/ODLeave");
 
     // Count regular leaves pending principal approval
     const pendingLeaveApprovals = await Leave.countDocuments({
@@ -250,18 +250,23 @@ router.get("/principal-pending-approvals", authMiddleware, async (req, res) => {
       status: "Pending",
     });
 
-    // Get pending charge handover approvals (try-catch in case model doesn't exist)
+    // Get pending charge handover approvals using Task model
     let pendingHandoverApprovals = 0;
     try {
-      const ChargeHandover = require("../models/ChargeHandover");
-      pendingHandoverApprovals = await ChargeHandover.countDocuments({
-        status: "Pending",
-        approvalLevel: "Principal",
+      // Count tasks that are pending HOD approval (first level)
+      const pendingHODApprovals = await Task.countDocuments({
+        status: "pending_hod",
       });
+      
+      // Count tasks that are pending faculty approval (second level)
+      const pendingFacultyApprovals = await Task.countDocuments({
+        status: "pending_faculty",
+      });
+      
+      // Total pending handover approvals for principal overview
+      pendingHandoverApprovals = pendingHODApprovals + pendingFacultyApprovals;
     } catch (error) {
-      console.log(
-        "ChargeHandover model not found, skipping handover approvals count"
-      );
+      console.log("Task model not found or error counting handover approvals:", error.message);
     }
 
     // Calculate total pending approvals
@@ -296,7 +301,7 @@ router.get("/debug-timetables", authMiddleware, async (req, res) => {
     }
 
     // Import Timetable model
-    const Timetable = require("../models/timetable");
+    
 
     // Get all timetables without any filtering
     const allTimetables = await Timetable.find({});
@@ -347,7 +352,6 @@ router.get("/principal-all-timetables", authMiddleware, async (req, res) => {
     }
 
     // Import Timetable model
-    const Timetable = require("../models/timetable");
 
     // Fetch all timetables without any filtering for principal
     const timetables = await Timetable.find({});
@@ -541,14 +545,25 @@ router.get("/non-teaching-stats", authMiddleware, async (req, res) => {
     }
 
     const stats = {
-      totalTasks: await Task.countDocuments({ assignedTo: req.user.id }),
+      totalTasks: await Task.countDocuments({ 
+        $or: [
+          { employeeId: req.user.employeeId },
+          { receiverId: req.user.id }
+        ]
+      }),
       completedTasks: await Task.countDocuments({
-        assignedTo: req.user.id,
-        status: "Completed",
+        $or: [
+          { employeeId: req.user.employeeId },
+          { receiverId: req.user.id }
+        ],
+        status: "approved",
       }),
       pendingTasks: await Task.countDocuments({
-        assignedTo: req.user.id,
-        status: "Pending",
+        $or: [
+          { employeeId: req.user.employeeId },
+          { receiverId: req.user.id }
+        ],
+        status: { $in: ["pending_hod", "pending_faculty"] },
       }),
       upcomingMeetings: 3, // Placeholder
       supportRequests: 8, // Placeholder
@@ -567,17 +582,27 @@ router.get("/task-data", authMiddleware, async (req, res) => {
     }
 
     const taskData = await Task.aggregate([
-      { $match: { assignedTo: req.user.id } },
+      { 
+        $match: { 
+          $or: [
+            { employeeId: req.user.employeeId },
+            { receiverId: req.user.id }
+          ]
+        } 
+      },
       {
         $group: {
-          _id: "$category",
+          _id: "$department",
           count: { $sum: 1 },
           completed: {
-            $sum: { $cond: [{ $eq: ["$status", "Completed"] }, 1, 0] },
+            $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] },
+          },
+          pending: {
+            $sum: { $cond: [{ $in: ["$status", ["pending_hod", "pending_faculty"]] }, 1, 0] },
           },
         },
       },
-      { $project: { name: "$_id", count: 1, completed: 1, _id: 0 } },
+      { $project: { name: "$_id", count: 1, completed: 1, pending: 1, _id: 0 } },
     ]);
     res.json(taskData);
   } catch (err) {
@@ -1195,4 +1220,274 @@ router.delete("/principal-todos-demo/:id", async (req, res) => {
   }
 });
 
+// ===========================================
+// CHARGE HANDOVER MANAGEMENT ENDPOINTS
+// ===========================================
+
+// HOD - Get pending charge handover requests for department
+router.get("/hod-pending-handovers", authMiddleware, async (req, res) => {
+  try {
+    const faculty = await Faculty.findById(req.user.id);
+    if (!faculty || faculty.role !== "hod") {
+      return res
+        .status(403)
+        .json({ error: "Access denied. HOD access required." });
+    }
+
+    const hodDepartment = faculty.department;
+    
+    const pendingHandovers = await Task.find({
+      department: hodDepartment,
+      status: "pending_hod",
+    }).sort({ date: -1 });
+
+    const stats = {
+      total: await Task.countDocuments({
+        department: hodDepartment,
+      }),
+      pendingHOD: await Task.countDocuments({
+        department: hodDepartment,
+        status: "pending_hod",
+      }),
+      pendingFaculty: await Task.countDocuments({
+        department: hodDepartment,
+        status: "pending_faculty",
+      }),
+      approved: await Task.countDocuments({
+        department: hodDepartment,
+        status: "approved",
+      }),
+      rejected: await Task.countDocuments({
+        department: hodDepartment,
+        status: "rejected",
+      }),
+    };
+
+    res.json({
+      handovers: pendingHandovers,
+      stats,
+      department: hodDepartment,
+    });
+  } catch (err) {
+    console.error("HOD pending handovers fetch error:", err);
+    res.status(500).json({ error: "Failed to fetch pending handovers" });
+  }
+});
+
+// Faculty - Get pending charge handover requests for receiver
+router.get("/faculty-pending-handovers", authMiddleware, async (req, res) => {
+  try {
+    const faculty = await Faculty.findById(req.user.id);
+    if (!faculty) {
+      return res.status(404).json({ error: "Faculty not found" });
+    }
+
+    const receiverId = req.user.id;
+    
+    const pendingHandovers = await Task.find({
+      receiverId: receiverId,
+      status: "pending_faculty",
+    }).sort({ date: -1 });
+
+    const stats = {
+      total: await Task.countDocuments({
+        receiverId: receiverId,
+      }),
+      pendingFaculty: await Task.countDocuments({
+        receiverId: receiverId,
+        status: "pending_faculty",
+      }),
+      approved: await Task.countDocuments({
+        receiverId: receiverId,
+        status: "approved",
+      }),
+      rejected: await Task.countDocuments({
+        receiverId: receiverId,
+        status: "rejected",
+      }),
+    };
+
+    res.json({
+      handovers: pendingHandovers,
+      stats,
+      receiverName: `${faculty.firstName} ${faculty.lastName}`.trim(),
+    });
+  } catch (err) {
+    console.error("Faculty pending handovers fetch error:", err);
+    res.status(500).json({ error: "Failed to fetch pending handovers" });
+  }
+});
+
+// Principal - Get all charge handover requests overview
+router.get("/principal-handover-overview", authMiddleware, async (req, res) => {
+  try {
+    if (req.user.role !== "principal") {
+      return res
+        .status(403)
+        .json({ error: "Unauthorized - Principal access required" });
+    }
+
+    const { department, status, limit = 50 } = req.query;
+
+    // Build query
+    let query = {};
+    if (department) {
+      query.department = department;
+    }
+    if (status) {
+      query.status = status;
+    }
+
+    const handovers = await Task.find(query)
+      .sort({ date: -1 })
+      .limit(parseInt(limit));
+
+    // Get department-wise statistics
+    const departmentStats = await Task.aggregate([
+      {
+        $group: {
+          _id: "$department",
+          total: { $sum: 1 },
+          pendingHOD: {
+            $sum: { $cond: [{ $eq: ["$status", "pending_hod"] }, 1, 0] },
+          },
+          pendingFaculty: {
+            $sum: { $cond: [{ $eq: ["$status", "pending_faculty"] }, 1, 0] },
+          },
+          approved: {
+            $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] },
+          },
+          rejected: {
+            $sum: { $cond: [{ $eq: ["$status", "rejected"] }, 1, 0] },
+          },
+        },
+      },
+      {
+        $project: {
+          department: "$_id",
+          total: 1,
+          pendingHOD: 1,
+          pendingFaculty: 1,
+          approved: 1,
+          rejected: 1,
+          _id: 0,
+        },
+      },
+    ]);
+
+    // Overall statistics
+    const overallStats = {
+      total: await Task.countDocuments({}),
+      pendingHOD: await Task.countDocuments({ status: "pending_hod" }),
+      pendingFaculty: await Task.countDocuments({ status: "pending_faculty" }),
+      approved: await Task.countDocuments({ status: "approved" }),
+      rejected: await Task.countDocuments({ status: "rejected" }),
+    };
+
+    res.json({
+      handovers,
+      departmentStats,
+      overallStats,
+    });
+  } catch (err) {
+    console.error("Principal handover overview fetch error:", err);
+    res.status(500).json({ error: "Failed to fetch handover overview" });
+  }
+});
+
+// Get charge handover request details by ID
+router.get("/handover-details/:id", authMiddleware, async (req, res) => {
+  try {
+    const handover = await Task.findById(req.params.id);
+    
+    if (!handover) {
+      return res.status(404).json({ error: "Handover request not found" });
+    }
+
+    // Check access rights
+    const faculty = await Faculty.findById(req.user.id);
+    const userRole = faculty?.role || req.user.role;
+    const userDepartment = faculty?.department || req.user.department;
+
+    // Allow access if:
+    // 1. User is principal
+    // 2. User is HOD of the same department
+    // 3. User is the receiver of the handover
+    // 4. User is the sender of the handover
+    const hasAccess = 
+      userRole === "principal" ||
+      (userRole === "hod" && userDepartment === handover.department) ||
+      req.user.id === handover.receiverId ||
+      req.user.id === handover.senderId ||
+      req.user.employeeId === handover.employeeId;
+
+    if (!hasAccess) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    res.json(handover);
+  } catch (err) {
+    console.error("Handover details fetch error:", err);
+    res.status(500).json({ error: "Failed to fetch handover details" });
+  }
+});
+
+// Get handover requests sent by current user
+router.get("/my-sent-handovers", authMiddleware, async (req, res) => {
+  try {
+    const faculty = await Faculty.findById(req.user.id);
+    if (!faculty) {
+      return res.status(404).json({ error: "Faculty not found" });
+    }
+
+    const sentHandovers = await Task.find({
+      $or: [
+        { senderId: req.user.id },
+        { employeeId: faculty.employeeId }
+      ]
+    }).sort({ date: -1 });
+
+    const stats = {
+      total: sentHandovers.length,
+      pendingHOD: sentHandovers.filter(h => h.status === "pending_hod").length,
+      pendingFaculty: sentHandovers.filter(h => h.status === "pending_faculty").length,
+      approved: sentHandovers.filter(h => h.status === "approved").length,
+      rejected: sentHandovers.filter(h => h.status === "rejected").length,
+    };
+
+    res.json({
+      handovers: sentHandovers,
+      stats,
+    });
+  } catch (err) {
+    console.error("Sent handovers fetch error:", err);
+    res.status(500).json({ error: "Failed to fetch sent handovers" });
+  }
+});
+
+// Get handover requests received by current user
+router.get("/my-received-handovers", authMiddleware, async (req, res) => {
+  try {
+    const receivedHandovers = await Task.find({
+      receiverId: req.user.id,
+    }).sort({ date: -1 });
+
+    const stats = {
+      total: receivedHandovers.length,
+      pendingFaculty: receivedHandovers.filter(h => h.status === "pending_faculty").length,
+      approved: receivedHandovers.filter(h => h.status === "approved").length,
+      rejected: receivedHandovers.filter(h => h.status === "rejected").length,
+    };
+
+    res.json({
+      handovers: receivedHandovers,
+      stats,
+    });
+  } catch (err) {
+    console.error("Received handovers fetch error:", err);
+    res.status(500).json({ error: "Failed to fetch received handovers" });
+  }
+});
+
 export default router;
+

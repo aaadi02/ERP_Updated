@@ -1,6 +1,6 @@
-const express = require('express');
+import express from "express.js";
 const router = express.Router();
-const circulationController = require('../controllers/circulationController');
+import circulationController from "../controllers/circulationController.js";
 
 // Borrow a Book
 router.post('/borrow', circulationController.borrowBook);
@@ -9,3 +9,4 @@ router.post('/borrow', circulationController.borrowBook);
 router.post('/return', circulationController.returnBook);
 
 module.exports = router;
+

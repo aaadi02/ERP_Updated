@@ -1,5 +1,5 @@
 import Attendance from "../models/attendance.js";
-import Student from "../models/student.js";
+import Student from "../models/StudentManagement.js";
 import Faculty from "../models/faculty.js";
 
 // GET /api/faculty/attendance/query?facultyId=...&subjectId=...&studentId=...&date=YYYY-MM-DD&from=YYYY-MM-DD&to=YYYY-MM-DD&type=day|week|month&month=...&year=...&page=...&limit=...
@@ -139,3 +139,4 @@ const queryAttendance = async (req, res) => {
 };
 
 export { queryAttendance };
+

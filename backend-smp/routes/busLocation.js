@@ -1,8 +1,8 @@
-const express = require('express');
+import express from "express.js";
 const router = express.Router();
-const Bus = require('../models/Bus');
-// const { getBusLocationHistory } = require('../controllers/busController');
-const { protect, authorize } = require('../middleware/auth');
+import Bus from "../models/Bus.js";
+// import { getBusLocationHistory } from "../controllers/busController.js";
+import { protect, authorize } from "../middleware/auth.js";
 
 // @desc    Update bus location and attendance
 // @route   PUT /api/buses/:id/location

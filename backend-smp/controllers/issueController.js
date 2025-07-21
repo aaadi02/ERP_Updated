@@ -2,7 +2,7 @@
 import IssueModel from '../models/Issue.js';
 import IssueRecord from '../models/IssueRecord.js';
 import Book from '../models/Book.js';
-import Student from '../models/student.js';
+import Student from '../models/StudentManagement.js';
 import Faculty from '../models/faculty.js';
 
 export const issueBookHandler = async (req, res) => {
@@ -392,3 +392,4 @@ export const returnBookHandler = async (req, res) => {
     });
   }
 };
+

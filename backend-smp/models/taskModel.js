@@ -170,3 +170,4 @@ export const updateTask = async (id, data) => {
     throw new Error(`Failed to update task: ${error.message}`);
   }
 };
+

@@ -1046,6 +1046,8 @@ router.post("/generate-certificate/:id", async (req, res) => {
   }
 });
 
+
+
 // Toggle student login access
 router.patch("/:id/toggle-access", async (req, res) => {
   try {

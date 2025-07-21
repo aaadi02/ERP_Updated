@@ -177,5 +177,16 @@ const restrictToAccountSection = async (req, res, next) => {
   }
   next();
 };
+const authorize = (...roles) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: `User role ${req.user.role} is not authorized to access this route`
+      });
+    }
+    next();
+  };
+};
 
-export { protect, protectConductor, protectDriver, validateHODDepartment, restrictToAccountSection };
+export { protect, protectConductor, protectDriver, validateHODDepartment, restrictToAccountSection,authorize };
